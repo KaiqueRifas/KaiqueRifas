@@ -69,7 +69,9 @@
         usuario_id: null,
         reservado_em: null,
         reservado_ate: null,
-        pago: false
+        pago: false,
+        reservado_email: null,
+        reservado_telefone: null
       })
       .neq("id", 0)
 
@@ -97,7 +99,9 @@
         usuario_id: null,
         reservado_em: null,
         reservado_ate: null,
-        pago: false
+        pago: false,
+        reservado_email: null,
+        reservado_telefone: null
       })
       .eq("id", id)
 
@@ -110,75 +114,7 @@
       .select("*")
       .order("id")
 
-    const { data: profiles } = await sb
-      .from("profiles")
-      .select("*")
-
-    const mapaProfiles = {}
-    ;(profiles || []).forEach(p => {
-      mapaProfiles[p.id] = p
-    })
-
     const listaReservados = document.getElementById("listaReservados")
     const listaPagos = document.getElementById("listaPagos")
 
-    listaReservados.innerHTML = ""
-    listaPagos.innerHTML = ""
-
-    items.forEach(item => {
-      if (item.status !== "reservado" && item.status !== "pago") return
-
-      const profile = mapaProfiles[item.usuario_id] || {}
-      const email = profile.email || "-"
-      const telefone = profile.telefone || "-"
-
-      const card = document.createElement("div")
-      card.className = "bicho " + item.status
-
-      card.innerHTML = `
-        <h3>${item.nome}</h3>
-        <p>Status: ${item.status}</p>
-        <p>Valor: R$ ${item.valor}</p>
-        <p>Email: ${email}</p>
-        <p>Telefone: ${telefone}</p>
-      `
-
-      if (item.status === "reservado") {
-        const btnConfirmar = document.createElement("button")
-        btnConfirmar.innerText = "Confirmar pagamento"
-        btnConfirmar.onclick = () => confirmar(item.id)
-
-        const btnLiberar = document.createElement("button")
-        btnLiberar.innerText = "Liberar"
-        btnLiberar.onclick = () => liberar(item.id)
-
-        card.appendChild(btnConfirmar)
-        card.appendChild(document.createElement("br"))
-        card.appendChild(document.createElement("br"))
-        card.appendChild(btnLiberar)
-
-        listaReservados.appendChild(card)
-      }
-
-      if (item.status === "pago") {
-        const btnLiberarPago = document.createElement("button")
-        btnLiberarPago.innerText = "Liberar"
-        btnLiberarPago.onclick = () => liberar(item.id)
-
-        card.appendChild(btnLiberarPago)
-
-        listaPagos.appendChild(card)
-      }
-    })
-  }
-
-  async function logout() {
-    await sb.auth.signOut()
-    window.location.href = "login.html"
-  }
-
-  carregar()
-</script>
-
-</body>
-</html>
+    listaReserv
