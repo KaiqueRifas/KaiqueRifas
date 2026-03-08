@@ -1,103 +1,66 @@
-admin.html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Admin</title>
+<title>Admin - Kaique Rifas</title>
 
 <link rel="stylesheet" href="style.css">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-
 </head>
 
 <body>
 
 <header class="topo">
-<h1>Painel Admin</h1>
+<h1>Painel ADM</h1>
+<button onclick="logout()">Sair</button>
 </header>
 
-
 <section class="card">
+<h2>Controle da Rifa</h2>
 
-<h2>Status da Rifa</h2>
-
-<button onclick="ligar()">Ligar</button>
-<button onclick="desligar()">Desligar</button>
-
-<p id="status"></p>
+<button onclick="ligar()">Ligar rifa</button>
+<button onclick="desligar()">Desligar rifa</button>
 
 </section>
 
-
 <section class="card">
 
-<h2>Reservas</h2>
+<h2>Itens reservados</h2>
 
 <div id="lista"></div>
 
 </section>
 
-
 <script>
 
-async function ligar(){
+async function carregar() {
 
-await supabase
-.from("campaigns")
-.update({ativa:true})
-.eq("id",1)
-
-carregar()
-
-}
-
-async function desligar(){
-
-await supabase
-.from("campaigns")
-.update({ativa:false})
-.eq("id",1)
-
-carregar()
-
-}
-
-async function carregar(){
-
-const { data } = await supabase
-.from("campaigns")
-.select("*")
-.eq("id",1)
-.single()
-
-document.getElementById("status").innerText=
-data.ativa ? "Rifa ligada" : "Rifa desligada"
-
-const { data:reservas } = await supabase
+const { data, error } = await sb
 .from("items")
 .select("*")
 .eq("status","reservado")
 
-const lista=document.getElementById("lista")
+const div = document.getElementById("lista")
+div.innerHTML = ""
 
-lista.innerHTML=""
+data.forEach(item => {
 
-reservas.forEach(r=>{
+const card = document.createElement("div")
+card.className = "bicho reservado"
 
-const div=document.createElement("div")
-div.className="itemAdmin"
+card.innerHTML = `
+<h3>${item.nome}</h3>
+<p>Valor: R$ ${item.valor}</p>
 
-div.innerHTML=`
-${r.nome}
-<button onclick="confirmar(${r.id})">Confirmar pagamento</button>
+<button onclick="confirmar(${item.id})">Confirmar pagamento</button>
+
+<button onclick="liberar(${item.id})">Liberar</button>
 `
 
-lista.appendChild(div)
+div.appendChild(card)
 
 })
 
@@ -105,13 +68,55 @@ lista.appendChild(div)
 
 async function confirmar(id){
 
-await supabase
+await sb
 .from("items")
-.update({status:"confirmado"})
+.update({
+status:"pago",
+pago:true
+})
 .eq("id",id)
 
 carregar()
 
+}
+
+async function liberar(id){
+
+await sb
+.from("items")
+.update({
+status:"livre",
+usuario_id:null,
+reservado_em:null,
+reservado_ate:null
+})
+.eq("id",id)
+
+carregar()
+
+}
+
+async function ligar(){
+
+await sb
+.from("campaigns")
+.update({ativa:true})
+.eq("id",1)
+
+}
+
+async function desligar(){
+
+await sb
+.from("campaigns")
+.update({ativa:false})
+.eq("id",1)
+
+}
+
+async function logout(){
+await sb.auth.signOut()
+window.location.href="login.html"
 }
 
 carregar()
