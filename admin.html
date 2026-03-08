@@ -9,7 +9,7 @@
   <title>Admin Rifa</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=1700"></script>
+  <script src="config.js?v=2000"></script>
 
   <style>
     body{
@@ -97,6 +97,11 @@
       border-color:#b7cbff;
     }
 
+    .item-box.deposito{
+      background:#eef9ff;
+      border-color:#a5d8f3;
+    }
+
     .linha{
       margin:6px 0;
       font-size:17px;
@@ -144,6 +149,11 @@
   </div>
 
   <div class="card">
+    <h2>Depósitos solicitados</h2>
+    <div id="listaDepositos"></div>
+  </div>
+
+  <div class="card">
     <h2>Saques solicitados</h2>
     <div id="listaSaques"></div>
   </div>
@@ -185,6 +195,11 @@ function formatarReal(v){
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })
+}
+
+function formatarData(data){
+  const d = new Date(data)
+  return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR")
 }
 
 async function buscarCampanhaMaisRecente(){
@@ -261,6 +276,7 @@ async function carregar(){
   document.getElementById("premiacao").value = campanha.premiacao || ""
   document.getElementById("msg").innerText = campanha.ativa ? "Rifa ligada" : "Rifa desligada"
 
+  await carregarDepositos()
   await carregarSaques()
   await carregarItensAdmin()
 }
@@ -414,6 +430,82 @@ async function adicionarSaldo(){
   document.getElementById("valorSaldo").value = ""
 }
 
+async function carregarDepositos(){
+  const { data, error } = await sb
+    .from("depositos")
+    .select("*")
+    .order("id", { ascending: false })
+
+  const lista = document.getElementById("listaDepositos")
+  lista.innerHTML = ""
+
+  if(error){
+    lista.innerHTML = `<div class="vazio">${error.message}</div>`
+    return
+  }
+
+  if(!data || data.length === 0){
+    lista.innerHTML = `<div class="vazio">Nenhum depósito encontrado.</div>`
+    return
+  }
+
+  data.forEach(dep => {
+    lista.innerHTML += `
+      <div class="item-box deposito">
+        <div class="titulo-item">Depósito #${dep.id}</div>
+        <div class="linha">Email: ${dep.email || "-"}</div>
+        <div class="linha">Valor: R$ ${formatarReal(dep.valor)}</div>
+        <div class="linha">Comprovante: ${dep.comprovante || "-"}</div>
+        <div class="linha">Status: ${dep.status || "-"}</div>
+        <div class="linha">Data: ${formatarData(dep.created_at)}</div>
+        ${dep.status !== "pago" ? `<button class="btn-verde" onclick="aprovarDeposito(${dep.id}, '${dep.email}', ${Number(dep.valor || 0)})">Aprovar depósito</button>` : ""}
+      </div>
+    `
+  })
+}
+
+async function aprovarDeposito(id, email, valor){
+  const { data: perfil, error: erroPerfil } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("email", String(email).toLowerCase())
+    .limit(1)
+
+  if(erroPerfil || !perfil || perfil.length === 0){
+    alert("Cliente não encontrado para crédito")
+    return
+  }
+
+  const cliente = perfil[0]
+  const novoSaldo = Number(cliente.saldo || 0) + Number(valor || 0)
+
+  const { error: erroSaldo } = await sb
+    .from("profiles")
+    .update({
+      saldo: novoSaldo
+    })
+    .eq("id", cliente.id)
+
+  if(erroSaldo){
+    alert(erroSaldo.message)
+    return
+  }
+
+  const { error: erroDep } = await sb
+    .from("depositos")
+    .update({
+      status: "pago"
+    })
+    .eq("id", id)
+
+  if(erroDep){
+    alert(erroDep.message)
+    return
+  }
+
+  await carregarDepositos()
+}
+
 async function carregarSaques(){
   const { data, error } = await sb
     .from("saques")
@@ -441,7 +533,8 @@ async function carregarSaques(){
         <div class="linha">Valor: R$ ${formatarReal(saque.valor)}</div>
         <div class="linha">Pix: ${saque.pix || "-"}</div>
         <div class="linha">Status: ${saque.status || "-"}</div>
-        <button class="btn-verde" onclick="marcarSaquePago(${saque.id})">Marcar como pago</button>
+        <div class="linha">Data: ${formatarData(saque.created_at)}</div>
+        ${saque.status !== "pago" ? `<button class="btn-verde" onclick="marcarSaquePago(${saque.id})">Marcar como pago</button>` : ""}
       </div>
     `
   })
@@ -481,13 +574,8 @@ async function carregarItensAdmin(){
     return
   }
 
-  const reservados = (data || []).filter(item =>
-    item.status === "reservado"
-  )
-
-  const pagos = (data || []).filter(item =>
-    item.status === "pago" || item.confirmado === true || item.pago === true
-  )
+  const reservados = (data || []).filter(item => item.status === "reservado")
+  const pagos = (data || []).filter(item => item.status === "pago" || item.confirmado === true || item.pago === true)
 
   if(reservados.length === 0){
     listaReservados.innerHTML = `<div class="vazio">Nenhum item reservado.</div>`
