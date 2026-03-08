@@ -9,7 +9,7 @@
   <title>Admin Rifa</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=1300"></script>
+  <script src="config.js?v=1700"></script>
 
   <style>
     body{
@@ -19,13 +19,21 @@
       margin:0;
     }
 
+    .container{
+      max-width:900px;
+      margin:auto;
+    }
+
     .card{
       background:white;
       padding:25px;
       border-radius:12px;
-      max-width:700px;
-      margin:auto;
       box-shadow:0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom:20px;
+    }
+
+    h2{
+      margin-top:0;
       margin-bottom:20px;
     }
 
@@ -52,41 +60,103 @@
       margin-bottom:10px;
     }
 
+    .btn-verde{
+      background:#1f8f4e;
+    }
+
+    .btn-vermelho{
+      background:#c0392b;
+    }
+
     .msg{
       margin-top:15px;
       font-weight:bold;
       white-space:pre-line;
+    }
+
+    .item-box{
+      border:1px solid #ddd;
+      border-radius:10px;
+      padding:16px;
+      margin-bottom:12px;
+      background:#fafafa;
+    }
+
+    .item-box.reservado{
+      background:#fff4cc;
+      border-color:#f1d676;
+    }
+
+    .item-box.pago{
+      background:#dff5df;
+      border-color:#9fd19f;
+    }
+
+    .item-box.saque{
+      background:#eef4ff;
+      border-color:#b7cbff;
+    }
+
+    .linha{
+      margin:6px 0;
+      font-size:17px;
+    }
+
+    .titulo-item{
+      font-size:22px;
+      font-weight:bold;
+      margin-bottom:10px;
+    }
+
+    .vazio{
+      color:#555;
+      font-size:17px;
     }
   </style>
 </head>
 
 <body>
 
-<div class="card">
+<div class="container">
 
-  <h2>Editar rifa</h2>
+  <div class="card">
+    <h2>Editar rifa</h2>
 
-  <input id="nome" placeholder="Nome da rifa">
-  <input id="valor" placeholder="0,00">
-  <textarea id="premiacao" rows="5" placeholder="Premiações"></textarea>
+    <input id="nome" placeholder="Nome da rifa">
+    <input id="valor" placeholder="0,00">
+    <textarea id="premiacao" rows="5" placeholder="Premiações"></textarea>
 
-  <button onclick="salvar()">Salvar</button>
-  <button onclick="desligar()">Desligar rifa</button>
+    <button onclick="salvar()">Salvar</button>
+    <button onclick="desligar()">Desligar rifa</button>
 
-  <div class="msg" id="msg"></div>
+    <div class="msg" id="msg"></div>
+  </div>
 
-</div>
+  <div class="card">
+    <h2>Adicionar saldo</h2>
 
-<div class="card">
+    <input id="emailSaldo" placeholder="Email do cliente">
+    <input id="valorSaldo" placeholder="Valor para adicionar">
 
-  <h2>Adicionar saldo</h2>
+    <button onclick="adicionarSaldo()">Adicionar saldo</button>
 
-  <input id="emailSaldo" placeholder="Email do cliente">
-  <input id="valorSaldo" placeholder="Valor para adicionar">
+    <div class="msg" id="msgSaldo"></div>
+  </div>
 
-  <button onclick="adicionarSaldo()">Adicionar saldo</button>
+  <div class="card">
+    <h2>Saques solicitados</h2>
+    <div id="listaSaques"></div>
+  </div>
 
-  <div class="msg" id="msgSaldo"></div>
+  <div class="card">
+    <h2>Itens reservados</h2>
+    <div id="listaReservados"></div>
+  </div>
+
+  <div class="card">
+    <h2>Itens pagos</h2>
+    <div id="listaPagos"></div>
+  </div>
 
 </div>
 
@@ -190,6 +260,9 @@ async function carregar(){
   document.getElementById("valor").value = formatarValorInput(campanha.valor)
   document.getElementById("premiacao").value = campanha.premiacao || ""
   document.getElementById("msg").innerText = campanha.ativa ? "Rifa ligada" : "Rifa desligada"
+
+  await carregarSaques()
+  await carregarItensAdmin()
 }
 
 async function salvar(){
@@ -284,6 +357,8 @@ async function desligar(){
   document.getElementById("valor").value = ""
   document.getElementById("premiacao").value = ""
   document.getElementById("msg").innerText = "Rifa desligada e itens resetados"
+
+  await carregar()
 }
 
 async function adicionarSaldo(){
@@ -337,6 +412,156 @@ async function adicionarSaldo(){
 
   document.getElementById("emailSaldo").value = ""
   document.getElementById("valorSaldo").value = ""
+}
+
+async function carregarSaques(){
+  const { data, error } = await sb
+    .from("saques")
+    .select("*")
+    .order("id", { ascending: false })
+
+  const lista = document.getElementById("listaSaques")
+  lista.innerHTML = ""
+
+  if(error){
+    lista.innerHTML = `<div class="vazio">${error.message}</div>`
+    return
+  }
+
+  if(!data || data.length === 0){
+    lista.innerHTML = `<div class="vazio">Nenhum saque encontrado.</div>`
+    return
+  }
+
+  data.forEach(saque => {
+    lista.innerHTML += `
+      <div class="item-box saque">
+        <div class="titulo-item">Saque #${saque.id}</div>
+        <div class="linha">Email: ${saque.email || "-"}</div>
+        <div class="linha">Valor: R$ ${formatarReal(saque.valor)}</div>
+        <div class="linha">Pix: ${saque.pix || "-"}</div>
+        <div class="linha">Status: ${saque.status || "-"}</div>
+        <button class="btn-verde" onclick="marcarSaquePago(${saque.id})">Marcar como pago</button>
+      </div>
+    `
+  })
+}
+
+async function marcarSaquePago(id){
+  const { error } = await sb
+    .from("saques")
+    .update({
+      status: "pago"
+    })
+    .eq("id", id)
+
+  if(error){
+    alert(error.message)
+    return
+  }
+
+  await carregarSaques()
+}
+
+async function carregarItensAdmin(){
+  const { data, error } = await sb
+    .from("items")
+    .select("*")
+    .order("id", { ascending: true })
+
+  const listaReservados = document.getElementById("listaReservados")
+  const listaPagos = document.getElementById("listaPagos")
+
+  listaReservados.innerHTML = ""
+  listaPagos.innerHTML = ""
+
+  if(error){
+    listaReservados.innerHTML = `<div class="vazio">${error.message}</div>`
+    listaPagos.innerHTML = `<div class="vazio">${error.message}</div>`
+    return
+  }
+
+  const reservados = (data || []).filter(item =>
+    item.status === "reservado"
+  )
+
+  const pagos = (data || []).filter(item =>
+    item.status === "pago" || item.confirmado === true || item.pago === true
+  )
+
+  if(reservados.length === 0){
+    listaReservados.innerHTML = `<div class="vazio">Nenhum item reservado.</div>`
+  }else{
+    reservados.forEach(item => {
+      listaReservados.innerHTML += `
+        <div class="item-box reservado">
+          <div class="titulo-item">${item.nome}</div>
+          <div class="linha">Status: Reservado</div>
+          <div class="linha">Email: ${item.reservado_email || "-"}</div>
+          <div class="linha">Telefone: ${item.reservado_telefone || "-"}</div>
+          <button class="btn-verde" onclick="confirmarPagamento(${item.id})">Confirmar pagamento</button>
+          <button class="btn-vermelho" onclick="liberarItem(${item.id})">Liberar item</button>
+        </div>
+      `
+    })
+  }
+
+  if(pagos.length === 0){
+    listaPagos.innerHTML = `<div class="vazio">Nenhum item pago.</div>`
+  }else{
+    pagos.forEach(item => {
+      listaPagos.innerHTML += `
+        <div class="item-box pago">
+          <div class="titulo-item">${item.nome}</div>
+          <div class="linha">Status: Pago</div>
+          <div class="linha">Email: ${item.reservado_email || "-"}</div>
+          <div class="linha">Telefone: ${item.reservado_telefone || "-"}</div>
+          <button class="btn-vermelho" onclick="liberarItem(${item.id})">Liberar item</button>
+        </div>
+      `
+    })
+  }
+}
+
+async function confirmarPagamento(id){
+  const { error } = await sb
+    .from("items")
+    .update({
+      status: "pago",
+      confirmado: true,
+      pago: true
+    })
+    .eq("id", id)
+
+  if(error){
+    alert(error.message)
+    return
+  }
+
+  await carregarItensAdmin()
+}
+
+async function liberarItem(id){
+  const { error } = await sb
+    .from("items")
+    .update({
+      status: "livre",
+      confirmado: false,
+      pago: false,
+      usuario_id: null,
+      reserved_by: null,
+      reservado_email: null,
+      reservado_telefone: null,
+      reservado_em: null
+    })
+    .eq("id", id)
+
+  if(error){
+    alert(error.message)
+    return
+  }
+
+  await carregarItensAdmin()
 }
 
 carregar()
