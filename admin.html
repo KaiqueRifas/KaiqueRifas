@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Painel ADM</title>
 
-  <link rel="stylesheet" href="style.css?v=90">
+  <link rel="stylesheet" href="style.css?v=100">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=90"></script>
+  <script src="config.js?v=100"></script>
 </head>
 <body>
 
@@ -43,11 +43,7 @@
   <br><br>
 
   <button onclick="salvarRifa()">Salvar alterações</button>
-</section>
 
-<section class="card">
-  <h2>Ferramentas</h2>
-  <button onclick="resetar()">RESETAR SISTEMA</button>
   <p id="msg"></p>
 </section>
 
@@ -91,10 +87,14 @@ async function carregarCampanha() {
 }
 
 async function atualizarValorDosItens(valor) {
-  await sb
+  const { error } = await sb
     .from("items")
     .update({ valor: valor })
     .not("id", "is", null)
+
+  if (error) {
+    document.getElementById("msg").innerText = error.message
+  }
 }
 
 async function salvarRifa() {
@@ -174,32 +174,7 @@ async function desligar() {
   document.getElementById("pixRifa").value = ""
 
   document.getElementById("statusCampanha").innerText = "Rifa desligada"
-  document.getElementById("msg").innerText = "Rifa desligada e zerada"
-  await carregar()
-}
-
-async function resetar() {
-  if (!confirm("Resetar tudo?")) return
-
-  const { error } = await sb
-    .from("items")
-    .update({
-      status: "livre",
-      usuario_id: null,
-      reservado_em: null,
-      reservado_ate: null,
-      pago: false,
-      reservado_email: null,
-      reservado_telefone: null
-    })
-    .not("id", "is", null)
-
-  if (error) {
-    document.getElementById("msg").innerText = error.message
-    return
-  }
-
-  document.getElementById("msg").innerText = "Sistema resetado"
+  document.getElementById("msg").innerText = "Rifa desligada"
   await carregar()
 }
 
