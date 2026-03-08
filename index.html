@@ -8,10 +8,9 @@
 <title>Rifa</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
+<script src="config.js?v=1000"></script>
 
 <style>
-
 body{
 font-family:Arial;
 background:#f2f2f2;
@@ -27,8 +26,9 @@ margin:auto;
 .topo{
 display:flex;
 justify-content:space-between;
-align-items:center;
+align-items:flex-start;
 margin-bottom:10px;
+gap:10px;
 }
 
 .userinfo{
@@ -63,6 +63,7 @@ padding:20px;
 border-radius:10px;
 text-align:center;
 font-weight:bold;
+cursor:pointer;
 }
 
 .livre{
@@ -71,16 +72,24 @@ background:#9be29b;
 
 .reservado{
 background:#ffd27a;
+cursor:default;
 }
 
 .pago{
 background:#7fb3ff;
+cursor:default;
 }
 
 .indisponivel{
 background:#ddd;
+cursor:default;
 }
 
+.msgtopo{
+margin-top:6px;
+font-weight:bold;
+color:#0b3d91;
+}
 </style>
 
 </head>
@@ -94,6 +103,7 @@ background:#ddd;
 <div class="userinfo">
 <div id="email"></div>
 <div id="saldo"></div>
+<div id="mensagem" class="msgtopo"></div>
 </div>
 
 <button class="logout" onclick="logout()">Sair</button>
@@ -115,160 +125,229 @@ Carregando rifa...
 </div>
 
 <script>
-
-let usuario
+let usuario = null
+let perfilAtual = null
 
 async function verificarLogin(){
+  const { data } = await sb.auth.getUser()
 
-const { data } = await sb.auth.getUser()
+  if(!data.user){
+    window.location.href = "login.html"
+    return false
+  }
 
-if(!data.user){
+  usuario = data.user
 
-window.location.href="login.html"
+  document.getElementById("email").innerText =
+    "Conta: " + usuario.email
 
-return
-
+  return true
 }
 
-usuario = data.user
+async function carregarPerfil(){
+  const { data, error } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("id", usuario.id)
+    .limit(1)
 
-document.getElementById("email").innerText =
-"Conta: " + usuario.email
+  if(error || !data || data.length === 0){
+    perfilAtual = null
+    document.getElementById("saldo").innerText = "Saldo: R$ 0,00"
+    return
+  }
 
-carregarSaldo()
+  perfilAtual = data[0]
+  const saldo = Number(perfilAtual.saldo || 0)
 
-}
-
-async function carregarSaldo(){
-
-let { data } = await sb
-.from("profiles")
-.select("saldo")
-.eq("id",usuario.id)
-.single()
-
-let saldo = data?.saldo || 0
-
-document.getElementById("saldo").innerText =
-"Saldo: R$ " + Number(saldo).toLocaleString("pt-BR",{minimumFractionDigits:2})
-
+  document.getElementById("saldo").innerText =
+    "Saldo: R$ " + saldo.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
 }
 
 async function logout(){
-
-await sb.auth.signOut()
-
-window.location.href="login.html"
-
+  await sb.auth.signOut()
+  window.location.href = "login.html"
 }
 
 function formatarReal(v){
-
-return Number(v||0).toLocaleString("pt-BR",{
-minimumFractionDigits:2,
-maximumFractionDigits:2
-})
-
+  return Number(v || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
 }
 
 async function buscarCampanha(){
+  const { data } = await sb
+    .from("campaigns")
+    .select("*")
+    .order("id", { ascending: false })
+    .limit(1)
 
-const { data } = await sb
-.from("campaigns")
-.select("*")
-.order("id",{ascending:false})
-.limit(1)
+  if(!data || data.length === 0) return null
 
-if(!data || data.length===0) return null
-
-return data[0]
-
+  return data[0]
 }
 
 async function carregarRifa(){
+  const campanha = await buscarCampanha()
+  const card = document.getElementById("card-rifa")
 
-const campanha = await buscarCampanha()
+  if(!campanha || !campanha.ativa){
+    card.innerHTML = `
+      <h2>Rifa</h2>
+      <p>Rifa desligada</p>
+    `
+    return null
+  }
 
-const card = document.getElementById("card-rifa")
+  card.innerHTML = `
+    <h2>${campanha.nome_rifa}</h2>
+    <p>Rifa ligada</p>
+    <p>Valor: R$ ${formatarReal(campanha.valor)}</p>
+    <p>Premiações:</p>
+    <p>${campanha.premiacao || ""}</p>
+  `
 
-if(!campanha || !campanha.ativa){
-
-card.innerHTML=`
-<h2>Rifa</h2>
-<p>Rifa desligada</p>
-`
-
-return
-
+  return campanha
 }
 
-card.innerHTML=`
-<h2>${campanha.nome_rifa}</h2>
-<p>Valor: R$ ${formatarReal(campanha.valor)}</p>
-<p>${campanha.premiacao}</p>
-`
+async function reservar(itemId){
+  document.getElementById("mensagem").innerText = ""
 
+  const campanha = await buscarCampanha()
+
+  if(!campanha || !campanha.ativa){
+    document.getElementById("mensagem").innerText = "Rifa desligada"
+    return
+  }
+
+  await carregarPerfil()
+
+  if(!perfilAtual){
+    document.getElementById("mensagem").innerText = "Perfil não encontrado"
+    return
+  }
+
+  const saldoAtual = Number(perfilAtual.saldo || 0)
+  const valorBicho = Number(campanha.valor || 0)
+
+  if(saldoAtual < valorBicho){
+    document.getElementById("mensagem").innerText = "Saldo insuficiente"
+    return
+  }
+
+  const { data: itemData, error: itemErro } = await sb
+    .from("items")
+    .select("*")
+    .eq("id", itemId)
+    .limit(1)
+
+  if(itemErro || !itemData || itemData.length === 0){
+    document.getElementById("mensagem").innerText = "Item não encontrado"
+    return
+  }
+
+  const item = itemData[0]
+
+  if(item.status === "reservado" || item.status === "pago" || item.confirmado === true || item.pago === true){
+    document.getElementById("mensagem").innerText = "Esse bicho já não está livre"
+    return
+  }
+
+  const novoSaldo = saldoAtual - valorBicho
+
+  const { error: erroItem } = await sb
+    .from("items")
+    .update({
+      status: "reservado",
+      reservado_email: usuario.email,
+      reservado_telefone: perfilAtual.telefone || "",
+      usuario_id: usuario.id,
+      reserved_by: usuario.id,
+      reservado_em: new Date().toISOString()
+    })
+    .eq("id", itemId)
+
+  if(erroItem){
+    document.getElementById("mensagem").innerText = erroItem.message
+    return
+  }
+
+  const { error: erroSaldo } = await sb
+    .from("profiles")
+    .update({
+      saldo: novoSaldo
+    })
+    .eq("id", usuario.id)
+
+  if(erroSaldo){
+    document.getElementById("mensagem").innerText = erroSaldo.message
+    return
+  }
+
+  document.getElementById("mensagem").innerText = "Bicho reservado com sucesso"
+  await carregarPerfil()
+  await carregarItens()
 }
 
 async function carregarItens(){
+  const campanha = await buscarCampanha()
 
-const campanha = await buscarCampanha()
+  const { data } = await sb
+    .from("items")
+    .select("*")
+    .order("id", { ascending: true })
 
-const { data } = await sb
-.from("items")
-.select("*")
-.order("id",{ascending:true})
+  const grid = document.getElementById("grid-itens")
+  grid.innerHTML = ""
 
-const grid=document.getElementById("grid-itens")
+  if(!data || data.length === 0){
+    grid.innerHTML = "<p>Nenhum item encontrado.</p>"
+    return
+  }
 
-grid.innerHTML=""
+  data.forEach(item => {
+    let classe = "livre"
+    let status = "Livre"
+    let acao = `onclick="reservar(${item.id})"`
 
-data.forEach(item=>{
+    if(!campanha || !campanha.ativa){
+      classe = "indisponivel"
+      status = "Indisponível"
+      acao = ""
+    }else if(item.status === "reservado"){
+      classe = "reservado"
+      status = item.usuario_id === usuario.id ? "Reservado por você" : "Reservado"
+      acao = ""
+    }else if(item.status === "pago" || item.confirmado === true || item.pago === true){
+      classe = "pago"
+      status = item.usuario_id === usuario.id ? "Pago por você" : "Pago"
+      acao = ""
+    }
 
-let classe="livre"
-let status="Livre"
-
-if(!campanha || !campanha.ativa){
-
-classe="indisponivel"
-status="Indisponível"
-
-}else if(item.status==="reservado"){
-
-classe="reservado"
-status="Reservado"
-
-}else if(item.status==="pago"){
-
-classe="pago"
-status="Pago"
-
-}
-
-grid.innerHTML+=`
-<div class="item ${classe}">
-${item.nome}<br>
-${status}<br>
-R$ ${formatarReal(campanha?campanha.valor:0)}
-</div>
-`
-
-})
-
+    grid.innerHTML += `
+      <div class="item ${classe}" ${acao}>
+        ${item.nome}<br>
+        ${status}<br>
+        R$ ${formatarReal(campanha ? campanha.valor : 0)}
+      </div>
+    `
+  })
 }
 
 async function iniciar(){
+  const ok = await verificarLogin()
+  if(!ok) return
 
-await verificarLogin()
-
-await carregarRifa()
-
-await carregarItens()
-
+  await carregarPerfil()
+  await carregarRifa()
+  await carregarItens()
 }
 
 iniciar()
-
 </script>
 
 </body>
