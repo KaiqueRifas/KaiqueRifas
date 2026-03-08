@@ -1,136 +1,238 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>Admin Rifa</title>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Rifa</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js?v=800"></script>
 
-<style>
-body{
-font-family: Arial, sans-serif;
-background:#f2f2f2;
-padding:20px;
-}
+  <style>
+    body{
+      font-family: Arial, sans-serif;
+      background:#f2f2f2;
+      padding:20px;
+      margin:0;
+    }
 
-.card{
-background:white;
-padding:25px;
-border-radius:12px;
-max-width:500px;
-margin:auto;
-box-shadow:0 2px 10px rgba(0,0,0,0.1);
-}
+    .card{
+      background:white;
+      padding:25px;
+      border-radius:12px;
+      max-width:500px;
+      margin:auto;
+      box-shadow:0 2px 10px rgba(0,0,0,0.1);
+    }
 
-input, textarea{
-width:100%;
-padding:12px;
-margin-top:10px;
-margin-bottom:15px;
-border-radius:8px;
-border:1px solid #ccc;
-font-size:16px;
-}
+    input, textarea{
+      width:100%;
+      padding:12px;
+      margin-top:10px;
+      margin-bottom:15px;
+      border-radius:8px;
+      border:1px solid #ccc;
+      font-size:16px;
+      box-sizing:border-box;
+    }
 
-button{
-padding:12px 20px;
-border:none;
-border-radius:8px;
-background:#0b3d91;
-color:white;
-font-size:16px;
-cursor:pointer;
-margin-right:10px;
-}
+    button{
+      padding:12px 20px;
+      border:none;
+      border-radius:8px;
+      background:#0b3d91;
+      color:white;
+      font-size:16px;
+      cursor:pointer;
+      margin-right:10px;
+    }
 
-button:hover{
-opacity:0.9;
-}
+    button:hover{
+      opacity:0.9;
+    }
 
-.msg{
-margin-top:15px;
-font-weight:bold;
-}
-</style>
+    .msg{
+      margin-top:15px;
+      font-weight:bold;
+      white-space:pre-line;
+    }
+  </style>
 </head>
 
 <body>
 
 <div class="card">
 
-<h2>Editar rifa</h2>
+  <h2>Editar rifa</h2>
 
-<input id="nome" placeholder="Nome da rifa">
-<input id="valor" placeholder="0,00">
-<textarea id="premiacao" rows="5" placeholder="Premiações"></textarea>
+  <input id="nome" placeholder="Nome da rifa">
+  <input id="valor" placeholder="0,00">
+  <textarea id="premiacao" rows="5" placeholder="Premiações"></textarea>
 
-<button onclick="salvar()">Salvar</button>
-<button onclick="desligar()">Desligar rifa</button>
+  <button onclick="salvar()">Salvar</button>
+  <button onclick="desligar()">Desligar rifa</button>
 
-<div class="msg" id="msg"></div>
+  <div class="msg" id="msg"></div>
 
 </div>
 
 <script>
+let campanhaAtualId = null
 
-const supabase = window.supabase.createClient(
-"https://hmtjkivzokhljxmrqime.supabase.co",
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtdGpraXZ6b2tobGp4bXJxaW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjE4MDEsImV4cCI6MjA4ODUzNzgwMX0.gJ6D7juAmcgI_tYc39JGeYOEcI5G5gUwxqyh3vwDR9w"
-)
-
-async function carregar(){
-
-let {data} = await supabase
-.from("campaigns")
-.select("*")
-.order("id",{ascending:false})
-.limit(1)
-
-if(data && data.length){
-
-document.getElementById("nome").value = data[0].nome_rifa || ""
-document.getElementById("valor").value = data[0].valor || ""
-document.getElementById("premiacao").value = data[0].premiacao || ""
-
+function tratarValor(valor){
+  const limpo = String(valor || "")
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".")
+  const numero = parseFloat(limpo)
+  return isNaN(numero) ? 0 : numero
 }
 
+function formatarValorInput(valor){
+  if(valor === null || valor === undefined || valor === "") return ""
+  return Number(valor).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+async function buscarCampanhaMaisRecente(){
+  const { data, error } = await sb
+    .from("campaigns")
+    .select("*")
+    .order("id", { ascending: false })
+    .limit(1)
+
+  if(error){
+    document.getElementById("msg").innerText = error.message
+    return null
+  }
+
+  if(data && data.length > 0){
+    return data[0]
+  }
+
+  const { data: novaData, error: novaError } = await sb
+    .from("campaigns")
+    .insert({
+      ativa: false,
+      titulo: "",
+      nome_rifa: "",
+      valor: 0,
+      premiacao: "",
+      chave_pix: ""
+    })
+    .select("*")
+    .limit(1)
+
+  if(novaError){
+    document.getElementById("msg").innerText = novaError.message
+    return null
+  }
+
+  if(novaData && novaData.length > 0){
+    return novaData[0]
+  }
+
+  return null
+}
+
+async function carregar(){
+  const campanha = await buscarCampanhaMaisRecente()
+
+  if(!campanha){
+    document.getElementById("msg").innerText = "Nenhuma campanha encontrada"
+    return
+  }
+
+  campanhaAtualId = campanha.id
+
+  document.getElementById("nome").value = campanha.nome_rifa || ""
+  document.getElementById("valor").value = formatarValorInput(campanha.valor)
+  document.getElementById("premiacao").value = campanha.premiacao || ""
+  document.getElementById("msg").innerText = campanha.ativa ? "Rifa ligada" : "Rifa desligada"
 }
 
 async function salvar(){
+  const campanha = await buscarCampanhaMaisRecente()
 
-let nome = document.getElementById("nome").value
-let valor = document.getElementById("valor").value.replace(",",".")
-let premiacao = document.getElementById("premiacao").value
+  if(!campanha){
+    document.getElementById("msg").innerText = "Campanha não encontrada"
+    return
+  }
 
-await supabase
-.from("campaigns")
-.update({
-nome_rifa:nome,
-valor:valor,
-premiacao:premiacao,
-ativa:true
-})
-.eq("id",1)
+  campanhaAtualId = campanha.id
 
-document.getElementById("msg").innerText="Rifa salva e ligada"
+  const nome = document.getElementById("nome").value.trim()
+  const valor = tratarValor(document.getElementById("valor").value)
+  const premiacao = document.getElementById("premiacao").value.trim()
 
+  if(!nome){
+    document.getElementById("msg").innerText = "Preencha o nome da rifa"
+    return
+  }
+
+  if(valor <= 0){
+    document.getElementById("msg").innerText = "Preencha um valor válido"
+    return
+  }
+
+  const { error } = await sb
+    .from("campaigns")
+    .update({
+      nome_rifa: nome,
+      titulo: nome,
+      valor: valor,
+      premiacao: premiacao,
+      ativa: true
+    })
+    .eq("id", campanhaAtualId)
+
+  if(error){
+    document.getElementById("msg").innerText = error.message
+    return
+  }
+
+  document.getElementById("msg").innerText = "Rifa salva e ligada"
+  await carregar()
 }
 
 async function desligar(){
+  const campanha = await buscarCampanhaMaisRecente()
 
-await supabase
-.from("campaigns")
-.update({
-ativa:false
-})
-.eq("id",1)
+  if(!campanha){
+    document.getElementById("msg").innerText = "Campanha não encontrada"
+    return
+  }
 
-document.getElementById("msg").innerText="Rifa desligada"
+  campanhaAtualId = campanha.id
 
+  const { error } = await sb
+    .from("campaigns")
+    .update({
+      ativa: false,
+      nome_rifa: "",
+      titulo: "",
+      valor: 0,
+      premiacao: ""
+    })
+    .eq("id", campanhaAtualId)
+
+  if(error){
+    document.getElementById("msg").innerText = error.message
+    return
+  }
+
+  document.getElementById("nome").value = ""
+  document.getElementById("valor").value = ""
+  document.getElementById("premiacao").value = ""
+  document.getElementById("msg").innerText = "Rifa desligada"
 }
 
 carregar()
-
 </script>
 
 </body>
