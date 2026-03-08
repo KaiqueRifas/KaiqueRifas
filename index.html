@@ -1,347 +1,64 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kaique Rifas</title>
+<meta charset="UTF-8">
+<title>Kaique Rifas</title>
 
-  <link rel="stylesheet" href="style.css?v=100">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=100"></script>
-
-  <style>
-    .toast-msg{
-      position:fixed;
-      left:50%;
-      bottom:20px;
-      transform:translateX(-50%);
-      background:#0d2d5f;
-      color:#fff;
-      padding:12px 16px;
-      border-radius:12px;
-      font-size:14px;
-      box-shadow:0 6px 18px rgba(0,0,0,0.2);
-      z-index:9999;
-      opacity:0;
-      pointer-events:none;
-      transition:opacity .2s ease, transform .2s ease;
-      max-width:90%;
-      text-align:center;
-    }
-
-    .toast-msg.show{
-      opacity:1;
-      transform:translateX(-50%) translateY(0);
-    }
-  </style>
+<style>
+body{font-family:Arial;background:#f3f3f3;margin:0;padding:20px}
+.card{background:#fff;padding:20px;border-radius:10px}
+</style>
 </head>
+
 <body>
 
-<header class="topo">
-  <h1>Kaique Rifas</h1>
+<div class="card">
 
-  <div>
-    <span id="userEmail"></span>
-    <button onclick="logout()">Sair</button>
-  </div>
-</header>
+<h2 id="titulo"></h2>
 
-<section class="card">
-  <h2 id="nomeRifaBox">Rifa</h2>
-  <p id="statusRifa">Carregando...</p>
-  <p id="valorRifaInfo"></p>
-  <p id="premiacaoRifa"></p>
-  <p id="pixRifaInfo"></p>
-</section>
+<p id="status"></p>
+<p id="valor"></p>
+<p id="premio"></p>
+<p id="pix"></p>
 
-<section class="card">
-  <h2>Itens disponíveis</h2>
-  <div class="grid" id="gridBichos"></div>
-</section>
-
-<section class="card" id="pixBox" style="display:none">
-  <h2>Pagamento PIX</h2>
-  <input id="pixChave" readonly>
-  <br><br>
-  <button onclick="copiarPix()">Copiar chave PIX</button>
-</section>
-
-<div id="toastMsg" class="toast-msg"></div>
+</div>
 
 <script>
-const grid = document.getElementById("gridBichos")
-const pixBox = document.getElementById("pixBox")
-const toastMsg = document.getElementById("toastMsg")
 
-let chavePix = ""
-let userId = ""
-let userEmail = ""
-let userTelefone = ""
-let rifaAtiva = false
-let valorAtualRifa = 0
+async function carregar(){
 
-function mostrarToast(texto){
-  toastMsg.innerText = texto
-  toastMsg.classList.add("show")
+const {data}=await sb
+.from("campaigns")
+.select("*")
+.eq("id",1)
+.single()
 
-  clearTimeout(window.toastTimer)
-  window.toastTimer = setTimeout(() => {
-    toastMsg.classList.remove("show")
-  }, 2200)
+if(!data.ativa){
+
+document.getElementById("titulo").innerText="Rifa"
+document.getElementById("status").innerText="Rifa desligada"
+document.getElementById("valor").innerText=""
+document.getElementById("premio").innerText=""
+document.getElementById("pix").innerText=""
+
+return
 }
 
-function tempoRestante(reserva){
-  const agora = new Date()
-  const fim = new Date(reserva)
-  const diff = fim - agora
+document.getElementById("titulo").innerText=data.nome_rifa
+document.getElementById("status").innerText="Rifa ligada"
+document.getElementById("valor").innerText="Valor: R$ "+data.valor
+document.getElementById("premio").innerText="Premiações: "+data.premiacao
+document.getElementById("pix").innerText="Pix: "+data.chave_pix
 
-  if(diff <= 0) return "00:00"
-
-  const min = Math.floor(diff / 60000)
-  const seg = Math.floor((diff % 60000) / 1000)
-
-  return `${min}:${seg.toString().padStart(2,"0")}`
 }
 
-async function carregarUsuario(){
-  const { data } = await sb.auth.getUser()
+carregar()
 
-  if (!data.user){
-    window.location.href = "login.html"
-    return
-  }
+setInterval(carregar,2000)
 
-  userId = data.user.id
-  userEmail = data.user.email || ""
-  document.getElementById("userEmail").innerText = userEmail
-
-  const { data: profile } = await sb
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle()
-
-  if (profile){
-    userTelefone = profile.telefone || ""
-  } else {
-    await sb.from("profiles").insert({
-      id: userId,
-      email: userEmail,
-      telefone: ""
-    })
-    userTelefone = ""
-  }
-}
-
-async function carregarCampanha(){
-  const { data, error } = await sb
-    .from("campaigns")
-    .select("*")
-    .order("id", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  if (error || !data){
-    rifaAtiva = false
-    valorAtualRifa = 0
-    chavePix = ""
-    document.getElementById("nomeRifaBox").innerText = "Rifa"
-    document.getElementById("statusRifa").innerText = "Rifa desligada"
-    document.getElementById("valorRifaInfo").innerText = ""
-    document.getElementById("premiacaoRifa").innerText = ""
-    document.getElementById("pixRifaInfo").innerText = ""
-    document.getElementById("pixChave").value = ""
-    return
-  }
-
-  rifaAtiva = !!data.ativa
-  valorAtualRifa = Number(data.valor || 0)
-  chavePix = data.chave_pix || ""
-
-  document.getElementById("nomeRifaBox").innerText = data.nome_rifa || "Rifa"
-  document.getElementById("statusRifa").innerText = rifaAtiva ? "Rifa ligada" : "Rifa desligada"
-  document.getElementById("valorRifaInfo").innerText = valorAtualRifa > 0 ? "Valor da rifa: R$ " + valorAtualRifa.toFixed(2).replace(".", ",") : ""
-  document.getElementById("premiacaoRifa").innerText = data.premiacao ? "Premiações: " + data.premiacao : ""
-  document.getElementById("pixRifaInfo").innerText = chavePix ? "Pix: " + chavePix : ""
-  document.getElementById("pixChave").value = chavePix
-}
-
-async function liberarExpirados(){
-  const agora = new Date().toISOString()
-
-  const { data: reservados } = await sb
-    .from("items")
-    .select("*")
-    .eq("status","reservado")
-
-  for(const item of reservados || []){
-    if(item.reservado_ate && item.reservado_ate < agora){
-      await sb
-        .from("items")
-        .update({
-          status:"livre",
-          usuario_id:null,
-          reservado_em:null,
-          reservado_ate:null,
-          pago:false,
-          reservado_email:null,
-          reservado_telefone:null
-        })
-        .eq("id", item.id)
-    }
-  }
-}
-
-async function carregarItens(){
-  await carregarCampanha()
-  await liberarExpirados()
-
-  const { data } = await sb
-    .from("items")
-    .select("*")
-    .order("id")
-
-  grid.innerHTML = ""
-
-  let temReserva = false
-
-  ;(data || []).forEach(item => {
-    const div = document.createElement("div")
-
-    let classe = "livre"
-    let textoStatus = "Livre"
-    let tempo = ""
-    let valorTexto = ""
-
-    if(!rifaAtiva){
-      classe = "pago-outro"
-      textoStatus = "Indisponível"
-    } else {
-      if(item.status === "livre"){
-        classe = "livre"
-        textoStatus = "Livre"
-      }
-
-      if(item.status === "reservado" && item.usuario_id !== userId){
-        classe = "reservado-outro"
-        textoStatus = "Reservado"
-      }
-
-      if(item.status === "reservado" && item.usuario_id === userId){
-        classe = "reservado-meu"
-        textoStatus = "Reservado"
-        temReserva = true
-      }
-
-      if(item.status === "pago" && item.usuario_id !== userId){
-        classe = "pago-outro"
-        textoStatus = "Pago"
-      }
-
-      if(item.status === "pago" && item.usuario_id === userId){
-        classe = "pago-meu"
-        textoStatus = "Pago"
-      }
-    }
-
-    if(valorAtualRifa > 0){
-      valorTexto = `<p class="tempo-card">R$ ${valorAtualRifa.toFixed(2).replace(".", ",")}</p>`
-    }
-
-    if(item.status === "reservado" && item.usuario_id === userId && item.reservado_ate){
-      tempo = `<p class="tempo-card">${tempoRestante(item.reservado_ate)}</p>`
-    }
-
-    div.className = "bicho " + classe
-    div.innerHTML = `
-      <h3>${item.nome}</h3>
-      <p class="status-card">${textoStatus}</p>
-      ${valorTexto}
-      ${tempo}
-    `
-
-    if(rifaAtiva && item.status === "livre"){
-      div.style.cursor = "pointer"
-      div.onclick = () => reservar(item.id)
-    } else {
-      div.style.cursor = "default"
-      div.onclick = () => {
-        if(!rifaAtiva){
-          mostrarToast("Rifa desligada")
-        }
-      }
-    }
-
-    grid.appendChild(div)
-  })
-
-  pixBox.style.display = (rifaAtiva && temReserva) ? "block" : "none"
-}
-
-async function reservar(id){
-  await carregarCampanha()
-
-  if(!rifaAtiva){
-    await carregarItens()
-    mostrarToast("Rifa desligada")
-    return
-  }
-
-  if(!userTelefone){
-    userTelefone = prompt("Digite seu telefone para contato:")
-
-    if(!userTelefone) return
-
-    await sb
-      .from("profiles")
-      .update({ telefone:userTelefone })
-      .eq("id",userId)
-  }
-
-  const reservadoEm = new Date()
-  const reservadoAte = new Date(Date.now() + 5 * 60 * 1000)
-
-  await sb
-    .from("items")
-    .update({
-      status:"reservado",
-      usuario_id:userId,
-      reservado_em:reservadoEm.toISOString(),
-      reservado_ate:reservadoAte.toISOString(),
-      pago:false,
-      reservado_email:userEmail,
-      reservado_telefone:userTelefone,
-      valor: valorAtualRifa
-    })
-    .eq("id",id)
-
-  await carregarItens()
-}
-
-function copiarPix(){
-  navigator.clipboard.writeText(chavePix)
-  mostrarToast("Chave PIX copiada")
-}
-
-async function logout(){
-  await sb.auth.signOut()
-  window.location.href = "login.html"
-}
-
-async function iniciar(){
-  await carregarUsuario()
-  await carregarItens()
-
-  setInterval(async () => {
-    await carregarItens()
-  }, 1500)
-}
-
-iniciar()
 </script>
 
 </body>
