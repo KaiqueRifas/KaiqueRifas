@@ -1,0 +1,122 @@
+admin.html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Admin</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+
+</head>
+
+<body>
+
+<header class="topo">
+<h1>Painel Admin</h1>
+</header>
+
+
+<section class="card">
+
+<h2>Status da Rifa</h2>
+
+<button onclick="ligar()">Ligar</button>
+<button onclick="desligar()">Desligar</button>
+
+<p id="status"></p>
+
+</section>
+
+
+<section class="card">
+
+<h2>Reservas</h2>
+
+<div id="lista"></div>
+
+</section>
+
+
+<script>
+
+async function ligar(){
+
+await supabase
+.from("campaigns")
+.update({ativa:true})
+.eq("id",1)
+
+carregar()
+
+}
+
+async function desligar(){
+
+await supabase
+.from("campaigns")
+.update({ativa:false})
+.eq("id",1)
+
+carregar()
+
+}
+
+async function carregar(){
+
+const { data } = await supabase
+.from("campaigns")
+.select("*")
+.eq("id",1)
+.single()
+
+document.getElementById("status").innerText=
+data.ativa ? "Rifa ligada" : "Rifa desligada"
+
+const { data:reservas } = await supabase
+.from("items")
+.select("*")
+.eq("status","reservado")
+
+const lista=document.getElementById("lista")
+
+lista.innerHTML=""
+
+reservas.forEach(r=>{
+
+const div=document.createElement("div")
+div.className="itemAdmin"
+
+div.innerHTML=`
+${r.nome}
+<button onclick="confirmar(${r.id})">Confirmar pagamento</button>
+`
+
+lista.appendChild(div)
+
+})
+
+}
+
+async function confirmar(id){
+
+await supabase
+.from("items")
+.update({status:"confirmado"})
+.eq("id",id)
+
+carregar()
+
+}
+
+carregar()
+
+</script>
+
+</body>
+</html>
