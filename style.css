@@ -1,88 +1,161 @@
-style.css
 body{
-font-family:Arial;
-background:#f2f2f2;
-margin:0;
-padding:0;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f5f5f5;
+  color: #111;
 }
 
 .topo{
-background:#0d2b52;
-color:white;
-padding:15px;
-display:flex;
-justify-content:space-between;
+  background: #0d2d5f;
+  color: #fff;
+  padding: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.logo-area h1{
-margin:0;
+.topo h1{
+  margin: 0;
+  font-size: 28px;
 }
 
-.user-area{
-display:flex;
-gap:10px;
-align-items:center;
+.topo button{
+  padding: 10px 16px;
+  border: 1px solid #777;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+.topo span{
+  margin-right: 10px;
+  font-size: 16px;
 }
 
 .card{
-background:white;
-padding:20px;
-margin:20px;
-border-radius:8px;
+  background: #fff;
+  margin: 18px;
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.card h2{
+  margin-top: 0;
+  font-size: 26px;
 }
 
 .grid{
-display:grid;
-grid-template-columns:repeat(4,1fr);
-gap:15px;
-padding:20px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
 }
 
 .bicho{
-background:white;
-border-radius:10px;
-padding:20px;
-text-align:center;
-cursor:pointer;
+  min-height: 170px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 16px 10px;
+  text-align: center;
+  box-sizing: border-box;
+  border: 1px solid rgba(0,0,0,0.08);
 }
 
-.bicho.livre{
-background:#d4ffd4;
+.bicho h3{
+  margin: 0 0 16px 0;
+  font-size: 24px;
 }
 
-.bicho.reservado{
-background:#ffe5a8;
+.status-card{
+  margin: 0;
+  font-size: 20px;
+  font-weight: bold;
 }
 
-.bicho.confirmado{
-background:#ffb3b3;
+.tempo-card{
+  margin: 14px 0 0 0;
+  font-size: 18px;
+  font-weight: bold;
 }
 
-.login-box{
-max-width:400px;
-margin:100px auto;
-background:white;
-padding:30px;
-border-radius:10px;
-display:flex;
-flex-direction:column;
-gap:10px;
+.livre{
+  background: #bfeec2;
 }
 
-input{
-padding:10px;
+.reservado-outro{
+  background: #f4df9f;
+}
+
+.reservado-meu{
+  background: #f4df9f;
+}
+
+.pago-outro{
+  background: #f6b2b2;
+}
+
+.pago-meu{
+  background: #a9d1ff;
+}
+
+#pixBox input{
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
 }
 
 button{
-padding:10px;
-cursor:pointer;
+  padding: 12px 18px;
+  border: 1px solid #777;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 16px;
 }
 
-.itemAdmin{
-background:#eee;
-padding:10px;
-margin:10px;
-border-radius:5px;
-display:flex;
-justify-content:space-between;
+.login-box{
+  max-width: 420px;
+  margin: 80px auto;
+  background: #fff;
+  padding: 24px;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.login-box h2{
+  margin-top: 0;
+  font-size: 34px;
+}
+
+.login-box input{
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  margin-bottom: 14px;
+  font-size: 18px;
+  border: 1px solid #999;
+  border-radius: 8px;
+}
+
+.login-box button{
+  width: 100%;
+}
+
+#msg{
+  margin-top: 16px;
+  font-size: 18px;
+}
+
+@media (min-width: 700px){
+  .grid{
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
