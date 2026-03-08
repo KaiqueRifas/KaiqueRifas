@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Painel ADM</title>
 
-  <link rel="stylesheet" href="style.css?v=52">
+  <link rel="stylesheet" href="style.css?v=60">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=52"></script>
+  <script src="config.js?v=60"></script>
 </head>
 <body>
 
@@ -27,7 +27,7 @@
 <section class="card">
   <h2>Editar rifa</h2>
 
-  <input type="number" id="valorRifa" placeholder="Valor da rifa" step="0.01">
+  <input type="number" id="valorRifa" placeholder="Valor da rifa" step="0.01" style="width:100%;padding:12px;border:1px solid #bbb;border-radius:8px;font-size:15px;">
 
   <br><br>
 
@@ -86,6 +86,17 @@ async function carregarCampanha() {
   document.getElementById("pixRifa").value = data.chave_pix || ""
 }
 
+async function atualizarValorDosItens(valor) {
+  const { error } = await sb
+    .from("items")
+    .update({ valor: valor })
+    .in("status", ["livre", "reservado"])
+
+  if (error) {
+    document.getElementById("msg").innerText = error.message
+  }
+}
+
 async function ligar() {
   if (!campanhaId) await carregarCampanha()
 
@@ -115,17 +126,37 @@ async function desligar() {
     return
   }
 
-  const { error } = await sb
+  const { errorCampanha } = await sb
     .from("campaigns")
     .update({ ativa: false })
     .eq("id", campanhaId)
 
-  if (error) {
-    document.getElementById("msg").innerText = error.message
+  if (errorCampanha) {
+    document.getElementById("msg").innerText = errorCampanha.message
+    return
+  }
+
+  const { errorItems } = await sb
+    .from("items")
+    .update({
+      status: "livre",
+      usuario_id: null,
+      reservado_em: null,
+      reservado_ate: null,
+      pago: false,
+      reservado_email: null,
+      reservado_telefone: null
+    })
+    .not("id", "is", null)
+
+  if (errorItems) {
+    document.getElementById("msg").innerText = errorItems.message
     return
   }
 
   document.getElementById("statusCampanha").innerText = "Rifa desligada"
+  document.getElementById("msg").innerText = "Rifa desligada e itens resetados"
+  await carregar()
 }
 
 async function salvarRifa() {
@@ -140,10 +171,12 @@ async function salvarRifa() {
   const premiacao = document.getElementById("premiacaoRifa").value.trim()
   const chavePix = document.getElementById("pixRifa").value.trim()
 
+  const valorNumero = valor ? Number(valor) : 0
+
   const { error } = await sb
     .from("campaigns")
     .update({
-      valor: valor ? Number(valor) : 0,
+      valor: valorNumero,
       premiacao: premiacao,
       chave_pix: chavePix
     })
@@ -154,7 +187,10 @@ async function salvarRifa() {
     return
   }
 
+  await atualizarValorDosItens(valorNumero)
+
   document.getElementById("msg").innerText = "Rifa atualizada"
+  await carregar()
 }
 
 async function resetar() {
