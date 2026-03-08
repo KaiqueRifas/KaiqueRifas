@@ -9,13 +9,35 @@
   <title>Kaique Rifas</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=201"></script>
+  <script src="config.js?v=300"></script>
 
   <style>
-    body{font-family:Arial,sans-serif;background:#f3f3f3;margin:0;padding:20px}
-    .card{background:#fff;padding:20px;border-radius:14px;max-width:700px;margin:0 auto}
-    h2{margin-top:0}
-    p{font-size:18px;line-height:1.5}
+    body{
+      font-family:Arial,sans-serif;
+      background:#f3f3f3;
+      margin:0;
+      padding:20px;
+    }
+
+    .card{
+      background:#fff;
+      padding:20px;
+      border-radius:14px;
+      max-width:700px;
+      margin:0 auto;
+    }
+
+    h2{
+      margin-top:0;
+      font-size:28px;
+    }
+
+    p{
+      font-size:18px;
+      line-height:1.5;
+      margin:10px 0;
+      white-space:pre-line;
+    }
   </style>
 </head>
 <body>
@@ -65,7 +87,7 @@ async function carregar() {
   document.getElementById("titulo").innerText = data.nome_rifa || "Rifa"
   document.getElementById("status").innerText = "Rifa ligada"
   document.getElementById("valor").innerText = "Valor: R$ " + formatarReal(data.valor)
-  document.getElementById("premio").innerText = data.premiacao ? "Premiações: " + data.premiacao : ""
+  document.getElementById("premio").innerText = data.premiacao ? "Premiações:\n" + data.premiacao : ""
   document.getElementById("pix").innerText = data.chave_pix ? "Pix: " + data.chave_pix : ""
 }
 
