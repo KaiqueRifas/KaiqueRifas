@@ -9,7 +9,7 @@
   <title>Admin Rifa</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=800"></script>
+  <script src="config.js?v=1000"></script>
 
   <style>
     body{
@@ -23,9 +23,10 @@
       background:white;
       padding:25px;
       border-radius:12px;
-      max-width:500px;
+      max-width:700px;
       margin:auto;
       box-shadow:0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom:20px;
     }
 
     input, textarea{
@@ -48,10 +49,7 @@
       font-size:16px;
       cursor:pointer;
       margin-right:10px;
-    }
-
-    button:hover{
-      opacity:0.9;
+      margin-bottom:10px;
     }
 
     .msg{
@@ -79,6 +77,19 @@
 
 </div>
 
+<div class="card">
+
+  <h2>Adicionar saldo</h2>
+
+  <input id="emailSaldo" placeholder="Email do cliente">
+  <input id="valorSaldo" placeholder="Valor para adicionar">
+
+  <button onclick="adicionarSaldo()">Adicionar saldo</button>
+
+  <div class="msg" id="msgSaldo"></div>
+
+</div>
+
 <script>
 let campanhaAtualId = null
 
@@ -94,6 +105,13 @@ function tratarValor(valor){
 function formatarValorInput(valor){
   if(valor === null || valor === undefined || valor === "") return ""
   return Number(valor).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+function formatarReal(v){
+  return Number(v || 0).toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })
@@ -230,6 +248,59 @@ async function desligar(){
   document.getElementById("valor").value = ""
   document.getElementById("premiacao").value = ""
   document.getElementById("msg").innerText = "Rifa desligada"
+}
+
+async function adicionarSaldo(){
+  const email = document.getElementById("emailSaldo").value.trim().toLowerCase()
+  const valorAdd = tratarValor(document.getElementById("valorSaldo").value)
+
+  if(!email){
+    document.getElementById("msgSaldo").innerText = "Preencha o email"
+    return
+  }
+
+  if(valorAdd <= 0){
+    document.getElementById("msgSaldo").innerText = "Preencha um valor válido"
+    return
+  }
+
+  const { data: perfil, error: erroPerfil } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("email", email)
+    .limit(1)
+
+  if(erroPerfil){
+    document.getElementById("msgSaldo").innerText = erroPerfil.message
+    return
+  }
+
+  if(!perfil || perfil.length === 0){
+    document.getElementById("msgSaldo").innerText = "Cliente não encontrado"
+    return
+  }
+
+  const cliente = perfil[0]
+  const saldoAtual = Number(cliente.saldo || 0)
+  const novoSaldo = saldoAtual + valorAdd
+
+  const { error: erroUpdate } = await sb
+    .from("profiles")
+    .update({
+      saldo: novoSaldo
+    })
+    .eq("id", cliente.id)
+
+  if(erroUpdate){
+    document.getElementById("msgSaldo").innerText = erroUpdate.message
+    return
+  }
+
+  document.getElementById("msgSaldo").innerText =
+    "Saldo atualizado para " + email + ": R$ " + formatarReal(novoSaldo)
+
+  document.getElementById("emailSaldo").value = ""
+  document.getElementById("valorSaldo").value = ""
 }
 
 carregar()
