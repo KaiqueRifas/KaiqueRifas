@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js?v=2200"></script>
+
+  <style>
+    body{
+      font-family:Arial,sans-serif;
+      background:#f2f2f2;
+      margin:0;
+      padding:20px;
+    }
+
+    .container{
+      max-width:900px;
+      margin:auto;
+    }
+
+    .topo{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:20px;
+      flex-wrap:wrap;
+    }
+
+    .botoes{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      border:none;
+      border-radius:8px;
+      padding:12px 18px;
+      color:white;
+      font-size:16px;
+      cursor:pointer;
+    }
+
+    .btn-voltar{
+      background:#0b3d91;
+    }
+
+    .btn-atualizar{
+      background:#1f8f4e;
+    }
+
+    .card{
+      background:white;
+      padding:22px;
+      border-radius:12px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom:20px;
+    }
+
+    .resumo{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:14px;
+    }
+
+    .box{
+      border-radius:10px;
+      padding:18px;
+      font-size:18px;
+      font-weight:bold;
+      text-align:center;
+    }
+
+    .entrada{
+      background:#dff5df;
+      border:1px solid #9fd19f;
+    }
+
+    .saida{
+      background:#ffe0e0;
+      border:1px solid #e3a7a7;
+    }
+
+    .saldo{
+      background:#eef4ff;
+      border:1px solid #b7cbff;
+    }
+
+    .item{
+      border:1px solid #ddd;
+      border-radius:10px;
+      padding:16px;
+      margin-bottom:12px;
+      background:#fafafa;
+    }
+
+    .item.deposito{
+      background:#eef9ff;
+      border-color:#a5d8f3;
+    }
+
+    .item.saque{
+      background:#fff4f4;
+      border-color:#efb4b4;
+    }
+
+    .titulo-item{
+      font-size:22px;
+      font-weight:bold;
+      margin-bottom:10px;
+    }
+
+    .linha{
+      margin:6px 0;
+      font-size:17px;
+    }
+
+    .vazio{
+      color:#555;
+      font-size:17px;
+    }
+
+    @media (max-width: 700px){
+      .resumo{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="topo">
+    <h1>Relatório</h1>
+
+    <div class="botoes">
+      <button class="btn btn-atualizar" onclick="carregarTudo()">Atualizar</button>
+      <button class="btn btn-voltar" onclick="window.location.href='admin.html'">Voltar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Resumo financeiro</h2>
+    <div class="resumo">
+      <div class="box entrada" id="totalDepositos">Depósitos pagos: R$ 0,00</div>
+      <div class="box saida" id="totalSaques">Saques pagos: R$ 0,00</div>
+      <div class="box saldo" id="saldoFinal">Saldo final: R$ 0,00</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Depósitos aprovados</h2>
+    <div id="listaDepositos"></div>
+  </div>
+
+  <div class="card">
+    <h2>Saques aprovados</h2>
+    <div id="listaSaques"></div>
+  </div>
+
+</div>
+
+<script>
+function formatarReal(v){
+  return Number(v || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+function formatarData(data){
+  const d = new Date(data)
+  return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR")
+}
+
+async function carregarDepositosPagos(){
+  const { data, error } = await sb
+    .from("depositos")
+    .select("*")
+    .eq("status", "pago")
+    .order("id", { ascending: false })
+
+  const lista = document.getElementById("listaDepositos")
+  lista.innerHTML = ""
+
+  if(error){
+    lista.innerHTML = `<div class="vazio">${error.message}</div>`
+    return { total: 0 }
+  }
+
+  if(!data || data.length === 0){
+    lista.innerHTML = `<div class="vazio">Nenhum depósito aprovado.</div>`
+    return { total: 0 }
+  }
+
+  let total = 0
+
+  data.forEach(dep => {
+    total += Number(dep.valor || 0)
+
+    lista.innerHTML += `
+      <div class="item deposito">
+        <div class="titulo-item">Depósito #${dep.id}</div>
+        <div class="linha">Email: ${dep.email || "-"}</div>
+        <div class="linha">Valor: R$ ${formatarReal(dep.valor)}</div>
+        <div class="linha">Comprovante: ${dep.comprovante || "-"}</div>
+        <div class="linha">Status: ${dep.status || "-"}</div>
+        <div class="linha">Data: ${formatarData(dep.created_at)}</div>
+      </div>
+    `
+  })
+
+  return { total }
+}
+
+async function carregarSaquesPagos(){
+  const { data, error } = await sb
+    .from("saques")
+    .select("*")
+    .eq("status", "pago")
+    .order("id", { ascending: false })
+
+  const lista = document.getElementById("listaSaques")
+  lista.innerHTML = ""
+
+  if(error){
+    lista.innerHTML = `<div class="vazio">${error.message}</div>`
+    return { total: 0 }
+  }
+
+  if(!data || data.length === 0){
+    lista.innerHTML = `<div class="vazio">Nenhum saque aprovado.</div>`
+    return { total: 0 }
+  }
+
+  let total = 0
+
+  data.forEach(saq => {
+    total += Number(saq.valor || 0)
+
+    lista.innerHTML += `
+      <div class="item saque">
+        <div class="titulo-item">Saque #${saq.id}</div>
+        <div class="linha">Email: ${saq.email || "-"}</div>
+        <div class="linha">Valor: R$ ${formatarReal(saq.valor)}</div>
+        <div class="linha">Pix: ${saq.pix || "-"}</div>
+        <div class="linha">Status: ${saq.status || "-"}</div>
+        <div class="linha">Data: ${formatarData(saq.created_at)}</div>
+      </div>
+    `
+  })
+
+  return { total }
+}
+
+async function carregarTudo(){
+  const dep = await carregarDepositosPagos()
+  const saq = await carregarSaquesPagos()
+
+  const totalDepositos = Number(dep.total || 0)
+  const totalSaques = Number(saq.total || 0)
+  const saldoFinal = totalDepositos - totalSaques
+
+  document.getElementById("totalDepositos").innerText =
+    "Depósitos pagos: R$ " + formatarReal(totalDepositos)
+
+  document.getElementById("totalSaques").innerText =
+    "Saques pagos: R$ " + formatarReal(totalSaques)
+
+  document.getElementById("saldoFinal").innerText =
+    "Saldo final: R$ " + formatarReal(saldoFinal)
+}
+
+carregarTudo()
+</script>
+
+</body>
+</html>
