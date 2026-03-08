@@ -8,7 +8,7 @@
 <title>Depósito</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=2000"></script>
+<script src="config.js?v=2100"></script>
 
 <style>
 body{
@@ -93,6 +93,14 @@ white-space:pre-line;
 font-size:18px;
 line-height:1.6;
 }
+
+.pix-fixo{
+font-size:22px;
+font-weight:bold;
+color:#0b3d91;
+margin-top:10px;
+word-break:break-word;
+}
 </style>
 
 </head>
@@ -113,6 +121,12 @@ line-height:1.6;
 <div class="card">
   <div class="info" id="email"></div>
   <div class="info" id="saldo"></div>
+</div>
+
+<div class="card">
+  <h2>Pix para depósito</h2>
+  <div class="info">Faça o depósito usando a chave abaixo:</div>
+  <div class="pix-fixo">123.123.123.12</div>
 </div>
 
 <div class="card">
