@@ -8,10 +8,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - Kaique Rifas</title>
 
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20"></script>
+  <script src="config.js?v=21"></script>
 </head>
 <body>
 
@@ -20,6 +20,7 @@
 
     <input type="email" id="email" placeholder="Email">
     <input type="password" id="senha" placeholder="Senha">
+    <input type="tel" id="telefone" placeholder="Telefone (só para cadastro)">
 
     <button type="button" onclick="login()">Entrar</button>
 
@@ -58,7 +59,7 @@
 
         if (!email || !senha) {
           mensagem.innerText = "Preencha email e senha"
-          debug("Campos vazios")
+          debug("Campos vazios no login")
           return
         }
 
@@ -95,16 +96,22 @@
 
         const email = document.getElementById("email").value.trim()
         const senha = document.getElementById("senha").value.trim()
+        const telefone = document.getElementById("telefone").value.trim()
 
-        if (!email || !senha) {
-          mensagem.innerText = "Preencha email e senha"
-          debug("Campos vazios")
+        if (!email || !senha || !telefone) {
+          mensagem.innerText = "Preencha email, senha e telefone"
+          debug("Campos vazios no cadastro")
           return
         }
 
         const { data, error } = await window.sb.auth.signUp({
           email: email,
-          password: senha
+          password: senha,
+          options: {
+            data: {
+              telefone: telefone
+            }
+          }
         })
 
         if (error) {
