@@ -1,147 +1,96 @@
-let campanhaId = null
+const SUPABASE_URL = "https://SEU_PROJETO.supabase.co"
+const SUPABASE_KEY = "SUA_PUBLIC_KEY"
 
-function tratarValor(v){
-  const limpo = String(v || "")
-    .replace(/\s/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".")
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 
-  const numero = parseFloat(limpo)
-  return isNaN(numero) ? 0 : numero
+async function carregarRifa(){
+
+  const { data } = await supabase
+    .from("campaigns")
+    .select("*")
+    .eq("ativa", true)
+    .single()
+
+  const card = document.getElementById("card-rifa")
+
+  if(!data){
+    card.innerHTML = "<h2>Rifa desligada</h2>"
+    return
+  }
+
+  card.innerHTML = `
+    <h2>${data.nome_rifa}</h2>
+    <p>Rifa ligada</p>
+    <p>Valor: R$ ${Number(data.valor).toFixed(2)}</p>
+    <p>Premiações:</p>
+    <p>${data.premiacao}</p>
+    <p>Pix: ${data.chave_pix}</p>
+  `
 }
 
-function formatarValorInput(v){
-  if (v === null || v === undefined || v === "") return ""
+async function carregarItens(){
 
-  return Number(v).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+  const { data } = await supabase
+    .from("items")
+    .select("*")
+    .order("id")
+
+  const grid = document.getElementById("grid-itens")
+  grid.innerHTML = ""
+
+  data.forEach(item => {
+
+    let status = "Livre"
+    let cor = "#9be29b"
+
+    if(item.status === "reservado"){
+      status = "Reservado"
+      cor = "#ffd27a"
+    }
+
+    if(item.confirmado){
+      status = "Pago"
+      cor = "#ff8c8c"
+    }
+
+    grid.innerHTML += `
+      <div 
+        onclick="reservar(${item.id})"
+        style="
+          background:${cor};
+          padding:20px;
+          border-radius:10px;
+          text-align:center;
+          cursor:pointer;
+        "
+      >
+        <h3>${item.nome}</h3>
+        <p>${status}</p>
+        <p>R$ ${Number(item.valor).toFixed(2)}</p>
+      </div>
+    `
   })
 }
 
-async function buscarCampanha(){
-  const { data, error } = await sb
-    .from("campaigns")
-    .select("*")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+async function reservar(id){
 
-  if (error){
-    document.getElementById("msg").innerText = error.message
-    return null
-  }
+  const nome = prompt("Seu nome")
+  if(!nome) return
 
-  if (data) return data
+  const telefone = prompt("Seu telefone")
+  if(!telefone) return
 
-  const { data: nova, error: erroNova } = await sb
-    .from("campaigns")
-    .insert({
-      ativa: false,
-      titulo: "",
-      valor: 0,
-      premiacao: "",
-      chave_pix: "",
-      nome_rifa: ""
-    })
-    .select()
-    .maybeSingle()
-
-  if (erroNova){
-    document.getElementById("msg").innerText = erroNova.message
-    return null
-  }
-
-  return nova
-}
-
-async function carregar(){
-  const campanha = await buscarCampanha()
-
-  if (!campanha){
-    document.getElementById("msg").innerText = "Campanha não encontrada"
-    return
-  }
-
-  campanhaId = campanha.id
-
-  document.getElementById("nome").value = campanha.nome_rifa || ""
-  document.getElementById("valor").value = formatarValorInput(campanha.valor)
-  document.getElementById("premio").value = campanha.premiacao || ""
-  document.getElementById("pix").value = campanha.chave_pix || ""
-
-  document.getElementById("msg").innerText = campanha.ativa ? "Rifa ligada" : "Rifa desligada"
-}
-
-async function salvar(){
-  const campanha = await buscarCampanha()
-
-  if (!campanha){
-    document.getElementById("msg").innerText = "Campanha não encontrada"
-    return
-  }
-
-  campanhaId = campanha.id
-
-  const nome = document.getElementById("nome").value.trim()
-  const valor = tratarValor(document.getElementById("valor").value)
-  const premio = document.getElementById("premio").value.trim()
-  const pix = document.getElementById("pix").value.trim()
-
-  const { error } = await sb
-    .from("campaigns")
+  await supabase
+    .from("items")
     .update({
-      nome_rifa: nome,
-      titulo: nome,
-      valor: valor,
-      premiacao: premio,
-      chave_pix: pix,
-      ativa: true
+      status:"reservado",
+      reservado_nome:nome,
+      reservado_telefone:telefone
     })
-    .eq("id", campanhaId)
+    .eq("id",id)
 
-  if (error){
-    document.getElementById("msg").innerText = error.message
-    return
-  }
-
-  await carregar()
-  document.getElementById("msg").innerText = "Rifa salva e ligada"
+  carregarItens()
 }
 
-async function desligar(){
-  const campanha = await buscarCampanha()
-
-  if (!campanha){
-    document.getElementById("msg").innerText = "Campanha não encontrada"
-    return
-  }
-
-  campanhaId = campanha.id
-
-  const { error } = await sb
-    .from("campaigns")
-    .update({
-      ativa: false,
-      nome_rifa: "",
-      titulo: "",
-      valor: 0,
-      premiacao: "",
-      chave_pix: ""
-    })
-    .eq("id", campanhaId)
-
-  if (error){
-    document.getElementById("msg").innerText = error.message
-    return
-  }
-
-  document.getElementById("nome").value = ""
-  document.getElementById("valor").value = ""
-  document.getElementById("premio").value = ""
-  document.getElementById("pix").value = ""
-
-  document.getElementById("msg").innerText = "Rifa desligada"
-}
-
-carregar()
+carregarRifa()
+carregarItens()
