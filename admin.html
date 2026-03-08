@@ -1,306 +1,104 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Painel ADM</title>
+<meta charset="UTF-8">
+<title>Painel ADM</title>
 
-  <link rel="stylesheet" href="style.css?v=100">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=100"></script>
+<style>
+body{font-family:Arial;background:#f3f3f3;margin:0;padding:20px}
+.card{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px}
+input,textarea{width:100%;padding:10px;margin-top:10px}
+button{padding:10px 20px;margin-top:10px}
+</style>
 </head>
+
 <body>
 
-<header class="topo">
-  <h1>Painel ADM</h1>
-  <button onclick="logout()">Sair</button>
-</header>
+<div class="card">
+<h2>Editar rifa</h2>
 
-<section class="card">
-  <h2>Controle da Rifa</h2>
-  <button onclick="desligar()">Desligar rifa</button>
-  <p id="statusCampanha"></p>
-</section>
+<input id="nome" placeholder="Nome da rifa">
+<input id="valor" type="number" placeholder="Valor">
+<textarea id="premio" placeholder="Premiações"></textarea>
+<input id="pix" placeholder="Pix">
 
-<section class="card">
-  <h2>Editar rifa</h2>
+<button onclick="salvar()">Salvar</button>
+<button onclick="desligar()">Desligar rifa</button>
 
-  <input type="text" id="nomeRifa" placeholder="Nome da rifa" style="width:100%;padding:12px;border:1px solid #bbb;border-radius:8px;font-size:15px;">
-
-  <br><br>
-
-  <input type="number" id="valorRifa" placeholder="Valor da rifa" step="0.01" style="width:100%;padding:12px;border:1px solid #bbb;border-radius:8px;font-size:15px;">
-
-  <br><br>
-
-  <textarea id="premiacaoRifa" placeholder="Premiações" rows="4" style="width:100%;padding:12px;border:1px solid #bbb;border-radius:8px;font-size:15px;"></textarea>
-
-  <br><br>
-
-  <input type="text" id="pixRifa" placeholder="Pix" style="width:100%;padding:12px;border:1px solid #bbb;border-radius:8px;font-size:15px;">
-
-  <br><br>
-
-  <button onclick="salvarRifa()">Salvar alterações</button>
-
-  <p id="msg"></p>
-</section>
-
-<section class="card">
-  <h2>Itens reservados</h2>
-  <div id="listaReservados" class="admin-lista"></div>
-</section>
-
-<section class="card">
-  <h2>Itens pagos</h2>
-  <div id="listaPagos" class="admin-lista"></div>
-</section>
+<p id="msg"></p>
+</div>
 
 <script>
-let campanhaId = null
 
-async function carregarCampanha() {
-  const { data, error } = await sb
-    .from("campaigns")
-    .select("*")
-    .order("id", { ascending: true })
-    .limit(1)
-    .maybeSingle()
+async function carregar(){
 
-  if (error) {
-    document.getElementById("msg").innerText = error.message
-    return
-  }
+const {data}=await sb
+.from("campaigns")
+.select("*")
+.eq("id",1)
+.single()
 
-  if (!data) {
-    document.getElementById("msg").innerText = "Nenhuma campanha cadastrada"
-    return
-  }
+document.getElementById("nome").value=data.nome_rifa||""
+document.getElementById("valor").value=data.valor||""
+document.getElementById("premio").value=data.premiacao||""
+document.getElementById("pix").value=data.chave_pix||""
 
-  campanhaId = data.id
-  document.getElementById("nomeRifa").value = data.nome_rifa || ""
-  document.getElementById("valorRifa").value = data.valor || ""
-  document.getElementById("premiacaoRifa").value = data.premiacao || ""
-  document.getElementById("pixRifa").value = data.chave_pix || ""
-  document.getElementById("statusCampanha").innerText = data.ativa ? "Rifa ligada" : "Rifa desligada"
 }
 
-async function atualizarValorDosItens(valor) {
-  const { error } = await sb
-    .from("items")
-    .update({ valor: valor })
-    .not("id", "is", null)
+async function salvar(){
 
-  if (error) {
-    document.getElementById("msg").innerText = error.message
-  }
+const nome=document.getElementById("nome").value
+const valor=document.getElementById("valor").value
+const premio=document.getElementById("premio").value
+const pix=document.getElementById("pix").value
+
+const {error}=await sb
+.from("campaigns")
+.update({
+nome_rifa:nome,
+valor:valor,
+premiacao:premio,
+chave_pix:pix,
+ativa:true
+})
+.eq("id",1)
+
+if(error){
+document.getElementById("msg").innerText=error.message
+return
 }
 
-async function salvarRifa() {
-  if (!campanhaId) await carregarCampanha()
+document.getElementById("msg").innerText="Rifa salva e ligada"
 
-  const nomeRifa = document.getElementById("nomeRifa").value.trim()
-  const valor = document.getElementById("valorRifa").value.trim()
-  const premiacao = document.getElementById("premiacaoRifa").value.trim()
-  const chavePix = document.getElementById("pixRifa").value.trim()
-
-  const valorNumero = valor ? Number(valor) : 0
-
-  const { error } = await sb
-    .from("campaigns")
-    .update({
-      nome_rifa: nomeRifa,
-      valor: valorNumero,
-      premiacao: premiacao,
-      chave_pix: chavePix,
-      ativa: true
-    })
-    .eq("id", campanhaId)
-
-  if (error) {
-    document.getElementById("msg").innerText = error.message
-    return
-  }
-
-  await atualizarValorDosItens(valorNumero)
-
-  document.getElementById("statusCampanha").innerText = "Rifa ligada"
-  document.getElementById("msg").innerText = "Rifa salva e ligada"
-  await carregar()
 }
 
-async function desligar() {
-  if (!campanhaId) await carregarCampanha()
+async function desligar(){
 
-  const { errorCampanha } = await sb
-    .from("campaigns")
-    .update({
-      ativa: false,
-      nome_rifa: "",
-      valor: 0,
-      premiacao: "",
-      chave_pix: ""
-    })
-    .eq("id", campanhaId)
+const {error}=await sb
+.from("campaigns")
+.update({
+ativa:false,
+nome_rifa:"",
+valor:0,
+premiacao:"",
+chave_pix:""
+})
+.eq("id",1)
 
-  if (errorCampanha) {
-    document.getElementById("msg").innerText = errorCampanha.message
-    return
-  }
-
-  const { errorItems } = await sb
-    .from("items")
-    .update({
-      status: "livre",
-      usuario_id: null,
-      reservado_em: null,
-      reservado_ate: null,
-      pago: false,
-      reservado_email: null,
-      reservado_telefone: null,
-      valor: 0
-    })
-    .not("id", "is", null)
-
-  if (errorItems) {
-    document.getElementById("msg").innerText = errorItems.message
-    return
-  }
-
-  document.getElementById("nomeRifa").value = ""
-  document.getElementById("valorRifa").value = ""
-  document.getElementById("premiacaoRifa").value = ""
-  document.getElementById("pixRifa").value = ""
-
-  document.getElementById("statusCampanha").innerText = "Rifa desligada"
-  document.getElementById("msg").innerText = "Rifa desligada"
-  await carregar()
+if(error){
+document.getElementById("msg").innerText=error.message
+return
 }
 
-async function confirmar(id) {
-  const { error } = await sb
-    .from("items")
-    .update({
-      status: "pago",
-      pago: true
-    })
-    .eq("id", id)
+document.getElementById("msg").innerText="Rifa desligada"
 
-  if (error) {
-    document.getElementById("msg").innerText = error.message
-    return
-  }
-
-  document.getElementById("msg").innerText = "Pagamento confirmado"
-  await carregar()
-}
-
-async function liberar(id) {
-  const { error } = await sb
-    .from("items")
-    .update({
-      status: "livre",
-      usuario_id: null,
-      reservado_em: null,
-      reservado_ate: null,
-      pago: false,
-      reservado_email: null,
-      reservado_telefone: null
-    })
-    .eq("id", id)
-
-  if (error) {
-    document.getElementById("msg").innerText = error.message
-    return
-  }
-
-  document.getElementById("msg").innerText = "Item liberado"
-  await carregar()
-}
-
-function criarCardAdmin(item) {
-  const email = item.reservado_email || "-"
-  const telefone = item.reservado_telefone || "-"
-
-  const card = document.createElement("div")
-  card.className = "admin-item " + item.status
-
-  card.innerHTML = `
-    <h3>${item.nome}</h3>
-    <p><b>Status:</b> ${item.status}</p>
-    <p><b>Email:</b> ${email}</p>
-    <p><b>Telefone:</b> ${telefone}</p>
-  `
-
-  return card
-}
-
-async function carregar() {
-  await carregarCampanha()
-
-  const { data: items, error } = await sb
-    .from("items")
-    .select("*")
-    .order("id")
-
-  if (error) {
-    document.getElementById("msg").innerText = error.message
-    return
-  }
-
-  const listaReservados = document.getElementById("listaReservados")
-  const listaPagos = document.getElementById("listaPagos")
-
-  listaReservados.innerHTML = ""
-  listaPagos.innerHTML = ""
-
-  items.forEach(item => {
-    if (item.status === "reservado") {
-      const card = criarCardAdmin(item)
-
-      const acoes = document.createElement("div")
-      acoes.className = "acoes"
-
-      const btnConfirmar = document.createElement("button")
-      btnConfirmar.innerText = "Confirmar"
-      btnConfirmar.onclick = () => confirmar(item.id)
-
-      const btnLiberar = document.createElement("button")
-      btnLiberar.innerText = "Liberar"
-      btnLiberar.onclick = () => liberar(item.id)
-
-      acoes.appendChild(btnConfirmar)
-      acoes.appendChild(btnLiberar)
-      card.appendChild(acoes)
-
-      listaReservados.appendChild(card)
-    }
-
-    if (item.status === "pago") {
-      const card = criarCardAdmin(item)
-
-      const acoes = document.createElement("div")
-      acoes.className = "acoes"
-
-      const btnLiberar = document.createElement("button")
-      btnLiberar.innerText = "Liberar"
-      btnLiberar.onclick = () => liberar(item.id)
-
-      acoes.appendChild(btnLiberar)
-      card.appendChild(acoes)
-
-      listaPagos.appendChild(card)
-    }
-  })
-}
-
-async function logout() {
-  await sb.auth.signOut()
-  window.location.href = "login.html"
 }
 
 carregar()
+
 </script>
 
 </body>
