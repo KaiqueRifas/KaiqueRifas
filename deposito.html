@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Depósito</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js?v=2000"></script>
+
+<style>
+body{
+font-family:Arial;
+background:#f2f2f2;
+padding:20px;
+margin:0;
+}
+
+.container{
+max-width:600px;
+margin:auto;
+}
+
+.topo{
+display:flex;
+justify-content:space-between;
+align-items:center;
+gap:10px;
+margin-bottom:20px;
+}
+
+.topo-botoes{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+margin-bottom:20px;
+box-shadow:0 2px 8px rgba(0,0,0,0.1);
+}
+
+input{
+width:100%;
+padding:12px;
+margin-bottom:12px;
+border:1px solid #ccc;
+border-radius:8px;
+font-size:16px;
+box-sizing:border-box;
+}
+
+button{
+border:none;
+padding:12px 16px;
+color:white;
+border-radius:8px;
+cursor:pointer;
+font-size:16px;
+}
+
+.btn-deposito{
+background:#0b3d91;
+width:100%;
+}
+
+.btn-voltar{
+background:#0b3d91;
+}
+
+.btn-sair{
+background:#c0392b;
+}
+
+.item{
+border-bottom:1px solid #eee;
+padding:12px 0;
+font-size:17px;
+}
+
+.msg{
+margin-top:10px;
+font-weight:bold;
+white-space:pre-line;
+}
+
+.info{
+font-size:18px;
+line-height:1.6;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="topo">
+  <h1>Depósito</h1>
+
+  <div class="topo-botoes">
+    <button class="btn-voltar" onclick="voltar()">Voltar</button>
+    <button class="btn-sair" onclick="logout()">Sair</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="info" id="email"></div>
+  <div class="info" id="saldo"></div>
+</div>
+
+<div class="card">
+
+  <h2>Solicitar depósito</h2>
+
+  <input id="valor" placeholder="Valor">
+  <input id="comprovante" placeholder="Comprovante / descrição / chave usada">
+
+  <button class="btn-deposito" onclick="solicitar()">Solicitar depósito</button>
+
+  <div id="msg" class="msg"></div>
+
+</div>
+
+<div class="card">
+
+  <h3>Histórico de depósitos</h3>
+
+  <div id="historico"></div>
+
+</div>
+
+</div>
+
+<script>
+let usuario = null
+let perfilAtual = null
+
+function formatarReal(v){
+  return Number(v || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+function formatarData(data){
+  const d = new Date(data)
+  return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR")
+}
+
+function tratarValor(valor){
+  const limpo = String(valor || "")
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".")
+  const numero = parseFloat(limpo)
+  return isNaN(numero) ? 0 : numero
+}
+
+async function verificarLogin(){
+  const { data } = await sb.auth.getUser()
+
+  if(!data.user){
+    window.location.href = "login.html"
+    return false
+  }
+
+  usuario = data.user
+  return true
+}
+
+async function carregarPerfil(){
+  const { data, error } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("id", usuario.id)
+    .limit(1)
+
+  if(error || !data || data.length === 0){
+    perfilAtual = null
+    document.getElementById("email").innerText = "Conta: " + usuario.email
+    document.getElementById("saldo").innerText = "Saldo: R$ 0,00"
+    return
+  }
+
+  perfilAtual = data[0]
+
+  document.getElementById("email").innerText = "Conta: " + usuario.email
+  document.getElementById("saldo").innerText = "Saldo: R$ " + formatarReal(perfilAtual.saldo || 0)
+}
+
+async function solicitar(){
+  document.getElementById("msg").innerText = ""
+
+  const valor = tratarValor(document.getElementById("valor").value)
+  const comprovante = document.getElementById("comprovante").value.trim()
+
+  if(valor <= 0){
+    document.getElementById("msg").innerText = "Informe um valor válido"
+    return
+  }
+
+  if(!comprovante){
+    document.getElementById("msg").innerText = "Preencha o comprovante ou descrição"
+    return
+  }
+
+  const { error } = await sb
+    .from("depositos")
+    .insert({
+      usuario_id: usuario.id,
+      email: usuario.email,
+      valor: valor,
+      comprovante: comprovante,
+      status: "pendente"
+    })
+
+  if(error){
+    document.getElementById("msg").innerText = error.message
+    return
+  }
+
+  document.getElementById("valor").value = ""
+  document.getElementById("comprovante").value = ""
+  document.getElementById("msg").innerText = "Depósito solicitado com sucesso"
+
+  await carregarHistorico()
+}
+
+async function carregarHistorico(){
+  const { data, error } = await sb
+    .from("depositos")
+    .select("*")
+    .eq("usuario_id", usuario.id)
+    .order("id", { ascending: false })
+
+  const div = document.getElementById("historico")
+  div.innerHTML = ""
+
+  if(error){
+    div.innerHTML = `<div class="item">${error.message}</div>`
+    return
+  }
+
+  if(!data || data.length === 0){
+    div.innerHTML = `<div class="item">Nenhum depósito solicitado.</div>`
+    return
+  }
+
+  data.forEach(d => {
+    div.innerHTML += `
+      <div class="item">
+        Valor: R$ ${formatarReal(d.valor)}<br>
+        Comprovante: ${d.comprovante || "-"}<br>
+        Status: ${d.status || "-"}<br>
+        Data: ${formatarData(d.created_at)}
+      </div>
+    `
+  })
+}
+
+function voltar(){
+  window.location.href = "index.html"
+}
+
+async function logout(){
+  await sb.auth.signOut()
+  window.location.href = "login.html"
+}
+
+async function iniciar(){
+  const ok = await verificarLogin()
+  if(!ok) return
+
+  await carregarPerfil()
+  await carregarHistorico()
+}
+
+iniciar()
+</script>
+
+</body>
+</html>
