@@ -8,7 +8,7 @@
 <title>Rifa</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=1000"></script>
+<script src="config.js?v=1200"></script>
 
 <style>
 body{
@@ -33,6 +33,21 @@ gap:10px;
 
 .userinfo{
 font-size:14px;
+}
+
+.botoes-topo{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+}
+
+.botao-topo{
+background:#0b3d91;
+padding:8px 14px;
+border-radius:6px;
+color:white;
+border:none;
+cursor:pointer;
 }
 
 .logout{
@@ -106,7 +121,10 @@ color:#0b3d91;
 <div id="mensagem" class="msgtopo"></div>
 </div>
 
+<div class="botoes-topo">
+<button class="botao-topo" onclick="window.location.href='minhas-apostas.html'">Minhas apostas</button>
 <button class="logout" onclick="logout()">Sair</button>
+</div>
 
 </div>
 
