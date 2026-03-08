@@ -2,13 +2,16 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kaique Rifas</title>
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=40">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
+  <script src="config.js?v=40"></script>
 </head>
 <body>
 
@@ -34,11 +37,8 @@
 
 <section class="card" id="pixBox" style="display:none">
   <h2>Pagamento PIX</h2>
-
   <input id="pixChave" readonly>
-
   <br><br>
-
   <button onclick="copiarPix()">Copiar chave PIX</button>
 </section>
 
@@ -65,9 +65,9 @@
   }
 
   async function carregarUsuario() {
-    const { data } = await sb.auth.getUser()
+    const { data, error } = await sb.auth.getUser()
 
-    if (!data.user) {
+    if (error || !data.user) {
       window.location.href = "login.html"
       return
     }
@@ -85,13 +85,6 @@
 
     if (profile) {
       userTelefone = profile.telefone || ""
-      if (!profile.email && userEmail) {
-        await sb.from("profiles").upsert({
-          id: userId,
-          email: userEmail,
-          telefone: userTelefone
-        })
-      }
     } else {
       await sb.from("profiles").upsert({
         id: userId,
@@ -113,13 +106,41 @@
       data.ativa ? "Campanha ligada" : "Campanha desligada"
 
     document.getElementById("valorRifa").innerText =
-      "Valor: R$ " + data.valor
+      "Valor: R$ " + Number(data.valor || 0).toFixed(2).replace(".", ",")
 
     chavePix = data.chave_pix || ""
     document.getElementById("pixChave").value = chavePix
   }
 
+  async function liberarExpirados() {
+    const agora = new Date().toISOString()
+
+    const { data: reservados } = await sb
+      .from("items")
+      .select("*")
+      .eq("status", "reservado")
+
+    for (const item of reservados || []) {
+      if (item.reservado_ate && item.reservado_ate < agora) {
+        await sb
+          .from("items")
+          .update({
+            status: "livre",
+            usuario_id: null,
+            reservado_em: null,
+            reservado_ate: null,
+            pago: false,
+            reservado_email: null,
+            reservado_telefone: null
+          })
+          .eq("id", item.id)
+      }
+    }
+  }
+
   async function carregarItens() {
+    await liberarExpirados()
+
     const { data } = await sb
       .from("items")
       .select("*")
@@ -162,7 +183,7 @@
       div.innerHTML = `
         <h3>${item.nome}</h3>
         <p>Status: ${item.status}</p>
-        <p>Valor: R$ ${item.valor}</p>
+        <p>Valor: R$ ${Number(item.valor || 0).toFixed(2).replace(".", ",")}</p>
         ${tempo}
         ${reservado}
       `
@@ -186,15 +207,15 @@
       .update({
         status: "reservado",
         usuario_id: userId,
-        reservado_em: reservadoEm,
-        reservado_ate: reservadoAte,
+        reservado_em: reservadoEm.toISOString(),
+        reservado_ate: reservadoAte.toISOString(),
         pago: false,
         reservado_email: userEmail,
         reservado_telefone: userTelefone
       })
       .eq("id", id)
 
-    carregarItens()
+    await carregarItens()
   }
 
   function copiarPix() {
@@ -211,7 +232,6 @@
     await carregarUsuario()
     await carregarCampanha()
     await carregarItens()
-
     setInterval(carregarItens, 1000)
   }
 
