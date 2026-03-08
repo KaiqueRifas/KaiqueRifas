@@ -24,6 +24,26 @@ max-width:700px;
 margin:auto;
 }
 
+.topo{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:10px;
+}
+
+.userinfo{
+font-size:14px;
+}
+
+.logout{
+background:#c0392b;
+padding:8px 14px;
+border-radius:6px;
+color:white;
+border:none;
+cursor:pointer;
+}
+
 .card{
 background:white;
 padding:20px;
@@ -61,22 +81,6 @@ background:#7fb3ff;
 background:#ddd;
 }
 
-.topo{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:10px;
-}
-
-.logout{
-background:#c0392b;
-padding:8px 14px;
-border-radius:6px;
-color:white;
-border:none;
-cursor:pointer;
-}
-
 </style>
 
 </head>
@@ -87,11 +91,12 @@ cursor:pointer;
 
 <div class="topo">
 
-<h2>Rifa</h2>
+<div class="userinfo">
+<div id="email"></div>
+<div id="saldo"></div>
+</div>
 
-<button class="logout" onclick="logout()">
-Sair
-</button>
+<button class="logout" onclick="logout()">Sair</button>
 
 </div>
 
@@ -111,15 +116,41 @@ Carregando rifa...
 
 <script>
 
+let usuario
+
 async function verificarLogin(){
 
-const { data } = await sb.auth.getSession()
+const { data } = await sb.auth.getUser()
 
-if(!data.session){
+if(!data.user){
 
-window.location.href = "login.html"
+window.location.href="login.html"
+
+return
 
 }
+
+usuario = data.user
+
+document.getElementById("email").innerText =
+"Conta: " + usuario.email
+
+carregarSaldo()
+
+}
+
+async function carregarSaldo(){
+
+let { data } = await sb
+.from("profiles")
+.select("saldo")
+.eq("id",usuario.id)
+.single()
+
+let saldo = data?.saldo || 0
+
+document.getElementById("saldo").innerText =
+"Saldo: R$ " + Number(saldo).toLocaleString("pt-BR",{minimumFractionDigits:2})
 
 }
 
@@ -127,13 +158,13 @@ async function logout(){
 
 await sb.auth.signOut()
 
-window.location.href = "login.html"
+window.location.href="login.html"
 
 }
 
 function formatarReal(v){
 
-return Number(v || 0).toLocaleString("pt-BR",{
+return Number(v||0).toLocaleString("pt-BR",{
 minimumFractionDigits:2,
 maximumFractionDigits:2
 })
@@ -162,7 +193,7 @@ const card = document.getElementById("card-rifa")
 
 if(!campanha || !campanha.ativa){
 
-card.innerHTML = `
+card.innerHTML=`
 <h2>Rifa</h2>
 <p>Rifa desligada</p>
 `
@@ -171,7 +202,7 @@ return
 
 }
 
-card.innerHTML = `
+card.innerHTML=`
 <h2>${campanha.nome_rifa}</h2>
 <p>Valor: R$ ${formatarReal(campanha.valor)}</p>
 <p>${campanha.premiacao}</p>
@@ -188,9 +219,9 @@ const { data } = await sb
 .select("*")
 .order("id",{ascending:true})
 
-const grid = document.getElementById("grid-itens")
+const grid=document.getElementById("grid-itens")
 
-grid.innerHTML = ""
+grid.innerHTML=""
 
 data.forEach(item=>{
 
@@ -214,11 +245,11 @@ status="Pago"
 
 }
 
-grid.innerHTML += `
+grid.innerHTML+=`
 <div class="item ${classe}">
 ${item.nome}<br>
 ${status}<br>
-R$ ${formatarReal(campanha ? campanha.valor : 0)}
+R$ ${formatarReal(campanha?campanha.valor:0)}
 </div>
 `
 
