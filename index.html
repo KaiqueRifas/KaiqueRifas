@@ -8,10 +8,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kaique Rifas</title>
 
-  <link rel="stylesheet" href="style.css?v=71">
+  <link rel="stylesheet" href="style.css?v=80">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=71"></script>
+  <script src="config.js?v=80"></script>
 </head>
 <body>
 
@@ -25,7 +25,7 @@
 </header>
 
 <section class="card">
-  <h2>Rifa</h2>
+  <h2>Rifa ativa</h2>
   <p id="statusRifa">Carregando...</p>
   <p id="premiacaoRifa"></p>
 </section>
@@ -51,20 +51,6 @@ let userId = ""
 let userEmail = ""
 let userTelefone = ""
 let rifaAtiva = false
-let valorAtualRifa = 0
-
-function tempoRestante(reserva){
-  const agora = new Date()
-  const fim = new Date(reserva)
-  const diff = fim - agora
-
-  if (diff <= 0) return "00:00"
-
-  const min = Math.floor(diff / 60000)
-  const seg = Math.floor((diff % 60000) / 1000)
-
-  return `${min}:${seg.toString().padStart(2, "0")}`
-}
 
 async function carregarUsuario(){
   const { data } = await sb.auth.getUser()
@@ -106,16 +92,14 @@ async function carregarCampanha(){
 
   if (error || !data){
     rifaAtiva = false
-    valorAtualRifa = 0
-    chavePix = ""
     document.getElementById("statusRifa").innerText = "Rifa desligada"
     document.getElementById("premiacaoRifa").innerText = ""
     document.getElementById("pixChave").value = ""
+    chavePix = ""
     return
   }
 
   rifaAtiva = !!data.ativa
-  valorAtualRifa = Number(data.valor || 0)
   chavePix = data.chave_pix || ""
 
   document.getElementById("statusRifa").innerText =
@@ -127,35 +111,8 @@ async function carregarCampanha(){
   document.getElementById("pixChave").value = chavePix
 }
 
-async function liberarExpirados(){
-  const agora = new Date().toISOString()
-
-  const { data: reservados } = await sb
-    .from("items")
-    .select("*")
-    .eq("status", "reservado")
-
-  for (const item of reservados || []){
-    if (item.reservado_ate && item.reservado_ate < agora){
-      await sb
-        .from("items")
-        .update({
-          status: "livre",
-          usuario_id: null,
-          reservado_em: null,
-          reservado_ate: null,
-          pago: false,
-          reservado_email: null,
-          reservado_telefone: null
-        })
-        .eq("id", item.id)
-    }
-  }
-}
-
 async function carregarItens(){
   await carregarCampanha()
-  await liberarExpirados()
 
   const { data } = await sb
     .from("items")
@@ -171,25 +128,10 @@ async function carregarItens(){
 
     let classe = "livre"
     let textoStatus = "Livre"
-    let tempo = ""
 
     if (!rifaAtiva){
-      if (item.status === "pago" && item.usuario_id === userId){
-        classe = "pago-meu"
-        textoStatus = "Pago"
-      } else if (item.status === "pago"){
-        classe = "pago-outro"
-        textoStatus = "Pago"
-      } else if (item.status === "reservado" && item.usuario_id === userId){
-        classe = "reservado-meu"
-        textoStatus = "Reservado"
-      } else if (item.status === "reservado"){
-        classe = "reservado-outro"
-        textoStatus = "Reservado"
-      } else {
-        classe = "pago-outro"
-        textoStatus = "Indisponível"
-      }
+      classe = "pago-outro"
+      textoStatus = "Indisponível"
     } else {
       if (item.status === "livre"){
         classe = "livre"
@@ -218,16 +160,10 @@ async function carregarItens(){
       }
     }
 
-    if (item.status === "reservado" && item.usuario_id === userId && item.reservado_ate){
-      tempo = `<p class="tempo-card">${tempoRestante(item.reservado_ate)}</p>`
-    }
-
     div.className = "bicho " + classe
-
     div.innerHTML = `
       <h3>${item.nome}</h3>
       <p class="status-card">${textoStatus}</p>
-      ${tempo}
     `
 
     if (rifaAtiva && item.status === "livre"){
@@ -252,34 +188,7 @@ async function reservar(id){
     return
   }
 
-  if (!userTelefone){
-    userTelefone = prompt("Digite seu telefone para contato:")
-    if (!userTelefone) return
-
-    await sb
-      .from("profiles")
-      .update({ telefone: userTelefone })
-      .eq("id", userId)
-  }
-
-  const reservadoEm = new Date()
-  const reservadoAte = new Date(Date.now() + 5 * 60 * 1000)
-
-  await sb
-    .from("items")
-    .update({
-      status: "reservado",
-      usuario_id: userId,
-      reservado_em: reservadoEm.toISOString(),
-      reservado_ate: reservadoAte.toISOString(),
-      pago: false,
-      reservado_email: userEmail,
-      reservado_telefone: userTelefone,
-      valor: valorAtualRifa
-    })
-    .eq("id", id)
-
-  await carregarItens()
+  alert("Reserva liberada só quando a rifa estiver ligada")
 }
 
 function copiarPix(){
