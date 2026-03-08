@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Saque</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js?v=1600"></script>
+
+<style>
+body{
+font-family:Arial;
+background:#f2f2f2;
+padding:20px;
+}
+
+.container{
+max-width:600px;
+margin:auto;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+margin-bottom:20px;
+}
+
+input{
+width:100%;
+padding:10px;
+margin-bottom:10px;
+}
+
+button{
+background:#27ae60;
+border:none;
+padding:10px;
+color:white;
+border-radius:6px;
+cursor:pointer;
+width:100%;
+}
+
+.item{
+border-bottom:1px solid #eee;
+padding:10px 0;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card">
+
+<h2>Solicitar saque</h2>
+
+<input id="valor" placeholder="Valor">
+
+<input id="pix" placeholder="Chave Pix">
+
+<button onclick="solicitar()">Solicitar saque</button>
+
+<div id="msg"></div>
+
+</div>
+
+<div class="card">
+
+<h3>Histórico de saques</h3>
+
+<div id="historico"></div>
+
+</div>
+
+</div>
+
+<script>
+
+let usuario=null
+
+async function iniciar(){
+
+const { data } = await sb.auth.getUser()
+
+if(!data.user){
+window.location.href="login.html"
+return
+}
+
+usuario=data.user
+
+carregarHistorico()
+
+}
+
+async function solicitar(){
+
+const valor=document.getElementById("valor").value
+const pix=document.getElementById("pix").value
+
+if(!valor || !pix){
+document.getElementById("msg").innerText="Preencha tudo"
+return
+}
+
+await sb
+.from("saques")
+.insert({
+usuario_id:usuario.id,
+email:usuario.email,
+valor:valor,
+pix:pix,
+status:"pendente"
+})
+
+document.getElementById("msg").innerText="Saque solicitado"
+
+carregarHistorico()
+
+}
+
+async function carregarHistorico(){
+
+const { data } = await sb
+.from("saques")
+.select("*")
+.eq("usuario_id",usuario.id)
+.order("id",{ascending:false})
+
+const div=document.getElementById("historico")
+
+div.innerHTML=""
+
+data.forEach(s=>{
+
+div.innerHTML+=`
+<div class="item">
+Valor: R$ ${Number(s.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})}
+<br>Status: ${s.status}
+</div>
+`
+
+})
+
+}
+
+iniciar()
+
+</script>
+
+</body>
+</html>
