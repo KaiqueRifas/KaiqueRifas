@@ -5,254 +5,251 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kaique Rifas</title>
 
-<link rel="stylesheet" href="style.css?v=41">
+<link rel="stylesheet" href="style.css?v=42">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=41"></script>
+<script src="config.js?v=42"></script>
 </head>
 
 <body>
 
 <header class="topo">
-<h1>Kaique Rifas</h1>
+  <h1>Kaique Rifas</h1>
 
-<div>
-<span id="userEmail"></span>
-<button onclick="logout()">Sair</button>
-</div>
+  <div>
+    <span id="userEmail"></span>
+    <button onclick="logout()">Sair</button>
+  </div>
 </header>
 
 <section class="card">
-<h2>Rifa ativa</h2>
-<p id="statusRifa">Carregando...</p>
-<p id="valorRifa"></p>
+  <h2>Rifa ativa</h2>
+  <p id="statusRifa">Carregando...</p>
 </section>
 
 <section class="card">
-<h2>Itens disponíveis</h2>
-<div class="grid" id="gridBichos"></div>
+  <h2>Itens disponíveis</h2>
+  <div class="grid" id="gridBichos"></div>
 </section>
 
 <section class="card" id="pixBox" style="display:none">
-<h2>Pagamento PIX</h2>
-
-<input id="pixChave" readonly>
-
-<br><br>
-
-<button onclick="copiarPix()">Copiar chave PIX</button>
+  <h2>Pagamento PIX</h2>
+  <input id="pixChave" readonly>
+  <br><br>
+  <button onclick="copiarPix()">Copiar chave PIX</button>
 </section>
 
 <script>
-
 const grid = document.getElementById("gridBichos")
 const pixBox = document.getElementById("pixBox")
 
-let chavePix=""
-let userId=""
-let userEmail=""
-let userTelefone=""
+let chavePix = ""
+let userId = ""
+let userEmail = ""
+let userTelefone = ""
 
 function tempoRestante(reserva){
+  const agora = new Date()
+  const fim = new Date(reserva)
+  const diff = fim - agora
 
-const agora=new Date()
-const fim=new Date(reserva)
-const diff=fim-agora
+  if(diff <= 0) return "00:00"
 
-if(diff<=0)return "00:00"
+  const min = Math.floor(diff / 60000)
+  const seg = Math.floor((diff % 60000) / 1000)
 
-const min=Math.floor(diff/60000)
-const seg=Math.floor((diff%60000)/1000)
-
-return `${min}:${seg.toString().padStart(2,"0")}`
-
+  return `${min}:${seg.toString().padStart(2,"0")}`
 }
 
 async function carregarUsuario(){
+  const { data } = await sb.auth.getUser()
 
-const {data}=await sb.auth.getUser()
+  if(!data.user){
+    window.location.href = "login.html"
+    return
+  }
 
-if(!data.user){
-window.location.href="login.html"
-return
-}
+  userId = data.user.id
+  userEmail = data.user.email || ""
 
-userId=data.user.id
-userEmail=data.user.email
+  document.getElementById("userEmail").innerText = userEmail
 
-document.getElementById("userEmail").innerText=userEmail
+  const { data: profile } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle()
 
-const {data:profile}=await sb
-.from("profiles")
-.select("*")
-.eq("id",userId)
-.maybeSingle()
+  if(profile){
+    userTelefone = profile.telefone || ""
+  }else{
+    await sb.from("profiles").insert({
+      id: userId,
+      email: userEmail,
+      telefone: ""
+    })
 
-if(profile){
-
-userTelefone=profile.telefone || ""
-
-}else{
-
-await sb.from("profiles").insert({
-id:userId,
-email:userEmail,
-telefone:""
-})
-
-userTelefone=""
-
-}
-
+    userTelefone = ""
+  }
 }
 
 async function carregarCampanha(){
+  const { data } = await sb
+    .from("campaigns")
+    .select("*")
+    .eq("id",1)
+    .single()
 
-const {data}=await sb
-.from("campaigns")
-.select("*")
-.eq("id",1)
-.single()
+  document.getElementById("statusRifa").innerText =
+    data.ativa ? "Campanha ligada" : "Campanha desligada"
 
-document.getElementById("statusRifa").innerText=
-data.ativa?"Campanha ligada":"Campanha desligada"
+  chavePix = data.chave_pix || ""
+  document.getElementById("pixChave").value = chavePix
+}
 
-document.getElementById("valorRifa").innerText=
-"Valor: R$ "+Number(data.valor).toFixed(2).replace(".",",")
+async function liberarExpirados(){
+  const agora = new Date().toISOString()
 
-chavePix=data.chave_pix||""
-document.getElementById("pixChave").value=chavePix
+  const { data: reservados } = await sb
+    .from("items")
+    .select("*")
+    .eq("status","reservado")
 
+  for(const item of reservados || []){
+    if(item.reservado_ate && item.reservado_ate < agora){
+      await sb
+        .from("items")
+        .update({
+          status: "livre",
+          usuario_id: null,
+          reservado_em: null,
+          reservado_ate: null,
+          pago: false,
+          reservado_email: null,
+          reservado_telefone: null
+        })
+        .eq("id", item.id)
+    }
+  }
 }
 
 async function carregarItens(){
+  await liberarExpirados()
 
-const {data}=await sb
-.from("items")
-.select("*")
-.order("id")
+  const { data } = await sb
+    .from("items")
+    .select("*")
+    .order("id")
 
-grid.innerHTML=""
+  grid.innerHTML = ""
 
-let temReserva=false
+  let temReserva = false
 
-data.forEach(item=>{
+  data.forEach(item => {
+    const div = document.createElement("div")
 
-const div=document.createElement("div")
-div.className="bicho "+item.status
+    let classe = "livre"
+    let tempo = ""
+    let textoStatus = "Livre"
 
-let tempo=""
-let reservado=""
+    if(item.status === "livre"){
+      classe = "livre"
+      textoStatus = "Livre"
+    }
 
-if(item.status==="reservado" && item.reservado_ate){
+    if(item.status === "reservado" && item.usuario_id !== userId){
+      classe = "reservado-outro"
+      textoStatus = "Reservado"
+    }
 
-tempo=`<p>Tempo: ${tempoRestante(item.reservado_ate)}</p>`
+    if(item.status === "reservado" && item.usuario_id === userId){
+      classe = "reservado-meu"
+      textoStatus = "Reservado"
+      temReserva = true
+    }
 
-}
+    if(item.status === "pago" && item.usuario_id !== userId){
+      classe = "pago-outro"
+      textoStatus = "Pago"
+    }
 
-if(item.usuario_id===userId){
+    if(item.status === "pago" && item.usuario_id === userId){
+      classe = "pago-meu"
+      textoStatus = "Pago"
+    }
 
-if(item.status==="reservado"){
-reservado="<p><b>Reservado por você</b></p>"
-temReserva=true
-}
+    div.className = "bicho " + classe
 
-if(item.status==="pago"){
-reservado="<p><b>Pago por você</b></p>"
-}
+    if(item.status === "reservado" && item.reservado_ate){
+      tempo = `<p class="tempo-card">${tempoRestante(item.reservado_ate)}</p>`
+    }
 
-}else{
+    div.innerHTML = `
+      <h3>${item.nome}</h3>
+      <p class="status-card">${textoStatus}</p>
+      ${tempo}
+    `
 
-if(item.status==="reservado"){
-reservado="<p><b>Reservado</b></p>"
-}
+    if(item.status === "livre"){
+      div.onclick = () => reservar(item.id)
+    }
 
-if(item.status==="pago"){
-reservado="<p><b>Pago</b></p>"
-}
+    grid.appendChild(div)
+  })
 
-}
-
-div.innerHTML=`
-<h3>${item.nome}</h3>
-<p>Status: ${item.status}</p>
-<p>Valor: R$ ${Number(item.valor).toFixed(2).replace(".",",")}</p>
-${tempo}
-${reservado}
-`
-
-if(item.status==="livre"){
-div.onclick=()=>reservar(item.id)
-}
-
-grid.appendChild(div)
-
-})
-
-pixBox.style.display=temReserva?"block":"none"
-
+  pixBox.style.display = temReserva ? "block" : "none"
 }
 
 async function reservar(id){
+  const reservadoEm = new Date()
+  const reservadoAte = new Date(Date.now() + 5 * 60 * 1000)
 
-if(!userTelefone){
+  if(!userTelefone){
+    userTelefone = prompt("Digite seu telefone para contato:")
 
-userTelefone=prompt("Digite seu telefone para contato:")
+    if(!userTelefone) return
 
-if(!userTelefone)return
+    await sb
+      .from("profiles")
+      .update({ telefone: userTelefone })
+      .eq("id", userId)
+  }
 
-await sb.from("profiles")
-.update({telefone:userTelefone})
-.eq("id",userId)
+  await sb
+    .from("items")
+    .update({
+      status: "reservado",
+      usuario_id: userId,
+      reservado_em: reservadoEm.toISOString(),
+      reservado_ate: reservadoAte.toISOString(),
+      pago: false,
+      reservado_email: userEmail,
+      reservado_telefone: userTelefone
+    })
+    .eq("id", id)
 
-}
-
-const reservadoEm=new Date()
-const reservadoAte=new Date(Date.now()+5*60*1000)
-
-await sb
-.from("items")
-.update({
-status:"reservado",
-usuario_id:userId,
-reservado_em:reservadoEm,
-reservado_ate:reservadoAte,
-pago:false,
-reservado_email:userEmail,
-reservado_telefone:userTelefone
-})
-.eq("id",id)
-
-carregarItens()
-
+  await carregarItens()
 }
 
 function copiarPix(){
-
-navigator.clipboard.writeText(chavePix)
-alert("Chave PIX copiada")
-
+  navigator.clipboard.writeText(chavePix)
+  alert("Chave PIX copiada")
 }
 
 async function logout(){
-
-await sb.auth.signOut()
-window.location.href="login.html"
-
+  await sb.auth.signOut()
+  window.location.href = "login.html"
 }
 
 async function iniciar(){
+  await carregarUsuario()
+  await carregarCampanha()
+  await carregarItens()
 
-await carregarUsuario()
-await carregarCampanha()
-await carregarItens()
-
-setInterval(carregarItens,1000)
-
+  setInterval(carregarItens, 1000)
 }
 
 iniciar()
-
 </script>
 
 </body>
