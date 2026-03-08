@@ -8,10 +8,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kaique Rifas</title>
 
-  <link rel="stylesheet" href="style.css?v=70">
+  <link rel="stylesheet" href="style.css?v=71">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=70"></script>
+  <script src="config.js?v=71"></script>
 </head>
 <body>
 
@@ -25,7 +25,7 @@
 </header>
 
 <section class="card">
-  <h2>Rifa ativa</h2>
+  <h2>Rifa</h2>
   <p id="statusRifa">Carregando...</p>
   <p id="premiacaoRifa"></p>
 </section>
@@ -76,7 +76,6 @@ async function carregarUsuario(){
 
   userId = data.user.id
   userEmail = data.user.email || ""
-
   document.getElementById("userEmail").innerText = userEmail
 
   const { data: profile } = await sb
@@ -98,18 +97,18 @@ async function carregarUsuario(){
 }
 
 async function carregarCampanha(){
-  const { data } = await sb
+  const { data, error } = await sb
     .from("campaigns")
     .select("*")
     .order("id", { ascending: true })
     .limit(1)
     .maybeSingle()
 
-  if (!data){
+  if (error || !data){
     rifaAtiva = false
     valorAtualRifa = 0
     chavePix = ""
-    document.getElementById("statusRifa").innerText = "Nenhuma rifa cadastrada"
+    document.getElementById("statusRifa").innerText = "Rifa desligada"
     document.getElementById("premiacaoRifa").innerText = ""
     document.getElementById("pixChave").value = ""
     return
@@ -224,6 +223,7 @@ async function carregarItens(){
     }
 
     div.className = "bicho " + classe
+
     div.innerHTML = `
       <h3>${item.nome}</h3>
       <p class="status-card">${textoStatus}</p>
@@ -231,7 +231,11 @@ async function carregarItens(){
     `
 
     if (rifaAtiva && item.status === "livre"){
+      div.style.cursor = "pointer"
       div.onclick = () => reservar(item.id)
+    } else {
+      div.style.cursor = "default"
+      div.onclick = null
     }
 
     grid.appendChild(div)
