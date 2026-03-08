@@ -1,136 +1,250 @@
-index.html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kaique Rifas</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kaique Rifas</title>
 
-<link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2">
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js?v=2"></script>
 </head>
-
 <body>
 
-<header class="topo">
-<div class="logo-area">
-<h1>Kaique Rifas</h1>
-</div>
+  <header class="topo">
+    <div class="logo-area">
+      <h1>Kaique Rifas</h1>
+    </div>
 
-<div class="user-area">
-<span id="userEmail"></span>
-<button onclick="logout()">Sair</button>
-</div>
-</header>
+    <div class="user-area">
+      <span id="userEmail"></span>
+      <button onclick="logout()">Sair</button>
+    </div>
+  </header>
 
+  <section class="info">
+    <div class="card">
+      <h2>Rifa ativa</h2>
+      <p id="statusRifa">Carregando...</p>
+      <p id="valorRifa"></p>
+      <p id="premiacaoRifa"></p>
+    </div>
+  </section>
 
-<section class="info">
-<div class="card">
-<h2>Rifa ativa</h2>
-<p id="statusRifa">Carregando...</p>
-</div>
-</section>
+  <section class="card">
+    <h2>Itens disponíveis</h2>
+    <p id="mensagem"></p>
+    <div class="grid" id="gridBichos"></div>
+  </section>
 
+  <script>
+    const grid = document.getElementById("gridBichos")
+    const mensagem = document.getElementById("mensagem")
 
-<section class="grid" id="gridBichos">
-</section>
+    async function carregarUsuario() {
+      const { data, error } = await supabase.auth.getUser()
 
+      if (error || !data.user) {
+        window.location.href = "login.html"
+        return
+      }
 
-<script>
+      document.getElementById("userEmail").innerText = data.user.email || ""
+    }
 
-const grid = document.getElementById("gridBichos")
+    async function carregarCampanha() {
+      const statusRifa = document.getElementById("statusRifa")
+      const valorRifa = document.getElementById("valorRifa")
+      const premiacaoRifa = document.getElementById("premiacaoRifa")
 
-async function carregarUsuario(){
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("*")
+        .order("id", { ascending: true })
+        .limit(1)
+        .maybeSingle()
 
-const { data:{ user } } = await supabase.auth.getUser()
+      if (error) {
+        statusRifa.innerText = "Erro ao carregar campanha"
+        valorRifa.innerText = error.message
+        premiacaoRifa.innerText = ""
+        return
+      }
 
-if(!user){
-window.location.href="login.html"
-return
-}
+      if (!data) {
+        statusRifa.innerText = "Nenhuma campanha cadastrada"
+        valorRifa.innerText = ""
+        premiacaoRifa.innerText = ""
+        return
+      }
 
-document.getElementById("userEmail").innerText=user.email
+      statusRifa.innerText = data.ativa ? "Campanha ligada" : "Campanha desligada"
+      valorRifa.innerText = "Valor: R$ " + Number(data.valor || 0).toFixed(2).replace(".", ",")
+      premiacaoRifa.innerText = data.premiacao ? "Premiação: " + data.premiacao : ""
+    }
 
-}
+    async function liberarReservasExpiradas() {
+      const agora = new Date().toISOString()
 
-async function carregarBichos(){
+      const { data, error } = await supabase
+        .from("items")
+        .select("id,status,reservado_ate,confirmado")
+        .eq("status", "reservado")
 
-grid.innerHTML="Carregando..."
+      if (error || !data) return
 
-const { data } = await supabase
-.from("items")
-.select("*")
-.order("id")
+      for (const item of data) {
+        if (item.confirmado === true) continue
 
-grid.innerHTML=""
+        if (item.reservado_ate && item.reservado_ate < agora) {
+          await supabase
+            .from("items")
+            .update({
+              status: "livre",
+              usuario_id: null,
+              reservado_em: null,
+              reservado_ate: null,
+              confirmado: false
+            })
+            .eq("id", item.id)
+        }
+      }
+    }
 
-data.forEach(item=>{
+    function formatarTempo(restanteMs) {
+      if (restanteMs <= 0) return "00:00"
+      const totalSeg = Math.floor(restanteMs / 1000)
+      const min = String(Math.floor(totalSeg / 60)).padStart(2, "0")
+      const seg = String(totalSeg % 60).padStart(2, "0")
+      return min + ":" + seg
+    }
 
-const div=document.createElement("div")
-div.className="bicho"
+    async function carregarItens() {
+      grid.innerHTML = "Carregando..."
 
-if(item.status==="livre"){
-div.classList.add("livre")
-}
+      await liberarReservasExpiradas()
 
-if(item.status==="reservado"){
-div.classList.add("reservado")
-}
+      const { data: authData } = await supabase.auth.getUser()
+      const user = authData.user
 
-if(item.status==="confirmado"){
-div.classList.add("confirmado")
-}
+      const { data, error } = await supabase
+        .from("items")
+        .select("*")
+        .order("id", { ascending: true })
 
-div.innerHTML=`
-<h3>${item.nome}</h3>
-<p>Status: ${item.status}</p>
-`
+      if (error) {
+        grid.innerHTML = ""
+        mensagem.innerText = "Erro ao carregar itens: " + error.message
+        return
+      }
 
-if(item.status==="livre"){
-div.onclick=()=>reservar(item.id)
-}
+      mensagem.innerText = ""
 
-grid.appendChild(div)
+      if (!data || data.length === 0) {
+        grid.innerHTML = "<p>Nenhum item cadastrado.</p>"
+        return
+      }
 
-})
+      grid.innerHTML = ""
 
-}
+      data.forEach(item => {
+        const div = document.createElement("div")
+        div.className = "bicho " + item.status
 
+        let textoTempo = ""
+        if (item.status === "reservado" && item.reservado_ate) {
+          const restante = new Date(item.reservado_ate).getTime() - Date.now()
+          textoTempo = "<p>Tempo: " + formatarTempo(restante) + "</p>"
+        }
 
-async function reservar(id){
+        let dono = ""
+        if (item.usuario_id && user && item.usuario_id === user.id) {
+          dono = "<p><strong>Reservado por você</strong></p>"
+        }
 
-const { data:{ user } } = await supabase.auth.getUser()
+        div.innerHTML = `
+          <h3>${item.nome}</h3>
+          <p>Status: ${item.status}</p>
+          <p>Valor: R$ ${Number(item.valor || 0).toFixed(2).replace(".", ",")}</p>
+          ${textoTempo}
+          ${dono}
+        `
 
-const tempo=new Date()
-tempo.setMinutes(tempo.getMinutes()+5)
+        if (item.status === "livre") {
+          div.onclick = () => reservar(item.id)
+        }
 
-await supabase
-.from("items")
-.update({
-status:"reservado",
-reserved_by:user.id,
-reserved_until:tempo
-})
-.eq("id",id)
+        grid.appendChild(div)
+      })
+    }
 
-carregarBichos()
+    async function reservar(id) {
+      mensagem.innerText = "Reservando..."
 
-}
+      const { data: authData, error: authError } = await supabase.auth.getUser()
 
-async function logout(){
+      if (authError || !authData.user) {
+        window.location.href = "login.html"
+        return
+      }
 
-await supabase.auth.signOut()
-window.location.href="login.html"
+      const user = authData.user
 
-}
+      const { data: itemAtual, error: itemErro } = await supabase
+        .from("items")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle()
 
-carregarUsuario()
-carregarBichos()
+      if (itemErro || !itemAtual) {
+        mensagem.innerText = "Erro ao buscar item"
+        return
+      }
 
-</script>
+      if (itemAtual.status !== "livre") {
+        mensagem.innerText = "Esse item não está mais livre"
+        carregarItens()
+        return
+      }
 
+      const reservadoEm = new Date()
+      const reservadoAte = new Date(Date.now() + 5 * 60 * 1000)
+
+      const { error } = await supabase
+        .from("items")
+        .update({
+          status: "reservado",
+          usuario_id: user.id,
+          reservado_em: reservadoEm.toISOString(),
+          reservado_ate: reservadoAte.toISOString(),
+          confirmado: false
+        })
+        .eq("id", id)
+        .eq("status", "livre")
+
+      if (error) {
+        mensagem.innerText = "Erro ao reservar: " + error.message
+        return
+      }
+
+      mensagem.innerText = "Item reservado por 5 minutos"
+      carregarItens()
+    }
+
+    async function logout() {
+      await supabase.auth.signOut()
+      window.location.href = "login.html"
+    }
+
+    async function iniciar() {
+      await carregarUsuario()
+      await carregarCampanha()
+      await carregarItens()
+      setInterval(carregarItens, 10000)
+    }
+
+    iniciar()
+  </script>
 </body>
 </html>
