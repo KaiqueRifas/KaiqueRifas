@@ -4,11 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kaique Rifas</title>
-
-  <link rel="stylesheet" href="style.css?v=2">
-
+  <link rel="stylesheet" href="style.css?v=3">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=2"></script>
+  <script src="config.js?v=3"></script>
 </head>
 <body>
 
@@ -35,80 +33,120 @@
   <section class="card">
     <h2>Itens disponíveis</h2>
     <p id="mensagem"></p>
-    <div class="grid" id="gridBichos"></div>
+    <div class="grid" id="gridBichos">Carregando...</div>
+  </section>
+
+  <section class="card">
+    <h2>Debug</h2>
+    <div id="debugBox"></div>
   </section>
 
   <script>
     const grid = document.getElementById("gridBichos")
     const mensagem = document.getElementById("mensagem")
+    const debugBox = document.getElementById("debugBox")
+
+    function debug(texto) {
+      const p = document.createElement("p")
+      p.innerText = texto
+      debugBox.appendChild(p)
+    }
 
     async function carregarUsuario() {
-      const { data, error } = await supabase.auth.getUser()
+      try {
+        debug("1. Verificando usuário...")
 
-      if (error || !data.user) {
-        window.location.href = "login.html"
-        return
+        const { data, error } = await sb.auth.getUser()
+
+        if (error) {
+          debug("Erro auth: " + error.message)
+          window.location.href = "login.html"
+          return false
+        }
+
+        if (!data.user) {
+          debug("Usuário não logado")
+          window.location.href = "login.html"
+          return false
+        }
+
+        document.getElementById("userEmail").innerText = data.user.email || ""
+        debug("Usuário OK: " + (data.user.email || "sem email"))
+        return true
+      } catch (e) {
+        debug("Erro carregarUsuario: " + e.message)
+        return false
       }
-
-      document.getElementById("userEmail").innerText = data.user.email || ""
     }
 
     async function carregarCampanha() {
-      const statusRifa = document.getElementById("statusRifa")
-      const valorRifa = document.getElementById("valorRifa")
-      const premiacaoRifa = document.getElementById("premiacaoRifa")
+      try {
+        debug("2. Buscando campanha...")
 
-      const { data, error } = await supabase
-        .from("campaigns")
-        .select("*")
-        .order("id", { ascending: true })
-        .limit(1)
-        .maybeSingle()
+        const { data, error } = await sb
+          .from("campaigns")
+          .select("*")
+          .order("id", { ascending: true })
+          .limit(1)
+          .maybeSingle()
 
-      if (error) {
-        statusRifa.innerText = "Erro ao carregar campanha"
-        valorRifa.innerText = error.message
-        premiacaoRifa.innerText = ""
-        return
+        if (error) {
+          document.getElementById("statusRifa").innerText = "Erro campanha"
+          document.getElementById("valorRifa").innerText = error.message
+          debug("Erro campaigns: " + error.message)
+          return
+        }
+
+        if (!data) {
+          document.getElementById("statusRifa").innerText = "Nenhuma campanha cadastrada"
+          debug("Tabela campaigns sem registro")
+          return
+        }
+
+        document.getElementById("statusRifa").innerText = data.ativa ? "Campanha ligada" : "Campanha desligada"
+        document.getElementById("valorRifa").innerText = "Valor: R$ " + Number(data.valor || 0).toFixed(2).replace(".", ",")
+        document.getElementById("premiacaoRifa").innerText = data.premiacao ? "Premiação: " + data.premiacao : ""
+        debug("Campanha OK")
+      } catch (e) {
+        document.getElementById("statusRifa").innerText = "Erro campanha"
+        debug("Erro carregarCampanha: " + e.message)
       }
-
-      if (!data) {
-        statusRifa.innerText = "Nenhuma campanha cadastrada"
-        valorRifa.innerText = ""
-        premiacaoRifa.innerText = ""
-        return
-      }
-
-      statusRifa.innerText = data.ativa ? "Campanha ligada" : "Campanha desligada"
-      valorRifa.innerText = "Valor: R$ " + Number(data.valor || 0).toFixed(2).replace(".", ",")
-      premiacaoRifa.innerText = data.premiacao ? "Premiação: " + data.premiacao : ""
     }
 
     async function liberarReservasExpiradas() {
-      const agora = new Date().toISOString()
+      try {
+        const agora = new Date().toISOString()
 
-      const { data, error } = await supabase
-        .from("items")
-        .select("id,status,reservado_ate,confirmado")
-        .eq("status", "reservado")
+        const { data, error } = await sb
+          .from("items")
+          .select("id,status,reservado_ate,confirmado")
+          .eq("status", "reservado")
 
-      if (error || !data) return
-
-      for (const item of data) {
-        if (item.confirmado === true) continue
-
-        if (item.reservado_ate && item.reservado_ate < agora) {
-          await supabase
-            .from("items")
-            .update({
-              status: "livre",
-              usuario_id: null,
-              reservado_em: null,
-              reservado_ate: null,
-              confirmado: false
-            })
-            .eq("id", item.id)
+        if (error) {
+          debug("Erro ao buscar reservados: " + error.message)
+          return
         }
+
+        for (const item of data || []) {
+          if (item.confirmado === true) continue
+
+          if (item.reservado_ate && item.reservado_ate < agora) {
+            await sb
+              .from("items")
+              .update({
+                status: "livre",
+                usuario_id: null,
+                reservado_em: null,
+                reservado_ate: null,
+                confirmado: false
+              })
+              .eq("id", item.id)
+          }
+        }
+
+        debug("Reservas expiradas verificadas")
+      } catch (e) {
+        debug("Erro liberarReservasExpiradas: " + e.message)
       }
     }
 
@@ -121,127 +159,160 @@
     }
 
     async function carregarItens() {
-      grid.innerHTML = "Carregando..."
+      try {
+        debug("3. Buscando items...")
+        grid.innerHTML = "Carregando..."
 
-      await liberarReservasExpiradas()
+        await liberarReservasExpiradas()
 
-      const { data: authData } = await supabase.auth.getUser()
-      const user = authData.user
+        const { data: authData } = await sb.auth.getUser()
+        const user = authData.user
 
-      const { data, error } = await supabase
-        .from("items")
-        .select("*")
-        .order("id", { ascending: true })
+        const { data, error } = await sb
+          .from("items")
+          .select("*")
+          .order("id", { ascending: true })
 
-      if (error) {
+        if (error) {
+          grid.innerHTML = ""
+          mensagem.innerText = "Erro ao carregar itens: " + error.message
+          debug("Erro items: " + error.message)
+          return
+        }
+
+        if (!data || data.length === 0) {
+          grid.innerHTML = "<p>Nenhum item cadastrado.</p>"
+          debug("Tabela items vazia")
+          return
+        }
+
+        debug("Items encontrados: " + data.length)
+
+        mensagem.innerText = ""
         grid.innerHTML = ""
-        mensagem.innerText = "Erro ao carregar itens: " + error.message
-        return
+
+        data.forEach(item => {
+          const div = document.createElement("div")
+          div.className = "bicho " + item.status
+
+          let textoTempo = ""
+          if (item.status === "reservado" && item.reservado_ate) {
+            const restante = new Date(item.reservado_ate).getTime() - Date.now()
+            textoTempo = "<p>Tempo: " + formatarTempo(restante) + "</p>"
+          }
+
+          let dono = ""
+          if (item.usuario_id && user && item.usuario_id === user.id) {
+            dono = "<p><strong>Reservado por você</strong></p>"
+          }
+
+          div.innerHTML = `
+            <h3>${item.nome}</h3>
+            <p>Status: ${item.status}</p>
+            <p>Valor: R$ ${Number(item.valor || 0).toFixed(2).replace(".", ",")}</p>
+            ${textoTempo}
+            ${dono}
+          `
+
+          if (item.status === "livre") {
+            div.onclick = () => reservar(item.id)
+          }
+
+          grid.appendChild(div)
+        })
+      } catch (e) {
+        grid.innerHTML = ""
+        mensagem.innerText = "Erro geral ao carregar itens"
+        debug("Erro carregarItens: " + e.message)
       }
-
-      mensagem.innerText = ""
-
-      if (!data || data.length === 0) {
-        grid.innerHTML = "<p>Nenhum item cadastrado.</p>"
-        return
-      }
-
-      grid.innerHTML = ""
-
-      data.forEach(item => {
-        const div = document.createElement("div")
-        div.className = "bicho " + item.status
-
-        let textoTempo = ""
-        if (item.status === "reservado" && item.reservado_ate) {
-          const restante = new Date(item.reservado_ate).getTime() - Date.now()
-          textoTempo = "<p>Tempo: " + formatarTempo(restante) + "</p>"
-        }
-
-        let dono = ""
-        if (item.usuario_id && user && item.usuario_id === user.id) {
-          dono = "<p><strong>Reservado por você</strong></p>"
-        }
-
-        div.innerHTML = `
-          <h3>${item.nome}</h3>
-          <p>Status: ${item.status}</p>
-          <p>Valor: R$ ${Number(item.valor || 0).toFixed(2).replace(".", ",")}</p>
-          ${textoTempo}
-          ${dono}
-        `
-
-        if (item.status === "livre") {
-          div.onclick = () => reservar(item.id)
-        }
-
-        grid.appendChild(div)
-      })
     }
 
     async function reservar(id) {
-      mensagem.innerText = "Reservando..."
+      try {
+        mensagem.innerText = "Reservando..."
 
-      const { data: authData, error: authError } = await supabase.auth.getUser()
+        const { data: authData, error: authError } = await sb.auth.getUser()
 
-      if (authError || !authData.user) {
-        window.location.href = "login.html"
-        return
-      }
+        if (authError || !authData.user) {
+          window.location.href = "login.html"
+          return
+        }
 
-      const user = authData.user
+        const user = authData.user
 
-      const { data: itemAtual, error: itemErro } = await supabase
-        .from("items")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle()
+        const { data: itemAtual, error: itemErro } = await sb
+          .from("items")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle()
 
-      if (itemErro || !itemAtual) {
-        mensagem.innerText = "Erro ao buscar item"
-        return
-      }
+        if (itemErro || !itemAtual) {
+          mensagem.innerText = "Erro ao buscar item"
+          debug("Erro buscar item: " + (itemErro ? itemErro.message : "item não encontrado"))
+          return
+        }
 
-      if (itemAtual.status !== "livre") {
-        mensagem.innerText = "Esse item não está mais livre"
+        if (itemAtual.status !== "livre") {
+          mensagem.innerText = "Esse item não está mais livre"
+          carregarItens()
+          return
+        }
+
+        const reservadoEm = new Date()
+        const reservadoAte = new Date(Date.now() + 5 * 60 * 1000)
+
+        const { error } = await sb
+          .from("items")
+          .update({
+            status: "reservado",
+            usuario_id: user.id,
+            reservado_em: reservadoEm.toISOString(),
+            reservado_ate: reservadoAte.toISOString(),
+            confirmado: false
+          })
+          .eq("id", id)
+          .eq("status", "livre")
+
+        if (error) {
+          mensagem.innerText = "Erro ao reservar: " + error.message
+          debug("Erro reservar: " + error.message)
+          return
+        }
+
+        mensagem.innerText = "Item reservado por 5 minutos"
+        debug("Item reservado: " + id)
         carregarItens()
-        return
+      } catch (e) {
+        mensagem.innerText = "Erro ao reservar"
+        debug("Erro reservar catch: " + e.message)
       }
-
-      const reservadoEm = new Date()
-      const reservadoAte = new Date(Date.now() + 5 * 60 * 1000)
-
-      const { error } = await supabase
-        .from("items")
-        .update({
-          status: "reservado",
-          usuario_id: user.id,
-          reservado_em: reservadoEm.toISOString(),
-          reservado_ate: reservadoAte.toISOString(),
-          confirmado: false
-        })
-        .eq("id", id)
-        .eq("status", "livre")
-
-      if (error) {
-        mensagem.innerText = "Erro ao reservar: " + error.message
-        return
-      }
-
-      mensagem.innerText = "Item reservado por 5 minutos"
-      carregarItens()
     }
 
     async function logout() {
-      await supabase.auth.signOut()
+      await sb.auth.signOut()
       window.location.href = "login.html"
     }
 
     async function iniciar() {
-      await carregarUsuario()
-      await carregarCampanha()
-      await carregarItens()
-      setInterval(carregarItens, 10000)
+      try {
+        debug("Iniciando sistema...")
+
+        if (!window.sb) {
+          debug("ERRO: cliente Supabase não encontrado em config.js")
+          document.getElementById("statusRifa").innerText = "Erro no config.js"
+          grid.innerHTML = ""
+          return
+        }
+
+        const ok = await carregarUsuario()
+        if (!ok) return
+
+        await carregarCampanha()
+        await carregarItens()
+        setInterval(carregarItens, 10000)
+      } catch (e) {
+        debug("Erro iniciar: " + e.message)
+      }
     }
 
     iniciar()
