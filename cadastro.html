@@ -1,33 +1,80 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Criar conta</title>
 
-<link rel="stylesheet" href="style.css">
+<title>Criar conta</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f2f2f2;
+margin:0;
+padding:20px;
+}
+
+.card{
+background:white;
+padding:25px;
+border-radius:12px;
+max-width:420px;
+margin:auto;
+box-shadow:0 2px 10px rgba(0,0,0,0.1);
+}
+
+input{
+width:100%;
+padding:12px;
+margin-top:10px;
+margin-bottom:15px;
+border-radius:8px;
+border:1px solid #ccc;
+font-size:16px;
+box-sizing:border-box;
+}
+
+button{
+width:100%;
+padding:12px;
+border:none;
+border-radius:8px;
+background:#0b3d91;
+color:white;
+font-size:16px;
+cursor:pointer;
+}
+
+.msg{
+margin-top:10px;
+font-weight:bold;
+text-align:center;
+}
+
+</style>
+
 </head>
 
 <body>
 
-<div class="login-box">
+<div class="card">
 
 <h2>Criar conta</h2>
 
-<input type="email" id="email" placeholder="Email">
-<input type="password" id="senha" placeholder="Senha">
-<input type="tel" id="telefone" placeholder="Telefone">
+<input id="email" placeholder="Email">
+<input id="senha" type="password" placeholder="Senha">
+<input id="telefone" placeholder="Telefone">
 
-<button onclick="criarConta()">Criar conta</button>
+<button onclick="criarConta()">
+Criar conta
+</button>
 
-<br><br>
-
-<button onclick="voltar()">Voltar para login</button>
-
-<p id="msg"></p>
+<div class="msg" id="msg"></div>
 
 </div>
 
@@ -35,47 +82,48 @@
 
 async function criarConta(){
 
-const email=document.getElementById("email").value.trim()
-const senha=document.getElementById("senha").value.trim()
-const telefone=document.getElementById("telefone").value.trim()
+let email = document.getElementById("email").value
+let senha = document.getElementById("senha").value
+let telefone = document.getElementById("telefone").value
 
-if(!email||!senha||!telefone){
+if(!email || !senha || !telefone){
+
 document.getElementById("msg").innerText="Preencha todos os campos"
+
 return
+
 }
 
-const {data,error}=await sb.auth.signUp({
+const { data, error } = await sb.auth.signUp({
+
 email:email,
 password:senha
+
 })
 
 if(error){
+
 document.getElementById("msg").innerText=error.message
+
 return
+
 }
 
-const user=data.user
+let user = data.user
 
 if(user){
 
-await sb.from("profiles").upsert({
+await sb.from("profiles").insert({
+
 id:user.id,
-email:email,
 telefone:telefone
+
 })
 
-document.getElementById("msg").innerText="Conta criada com sucesso"
-
-setTimeout(()=>{
-window.location.href="login.html"
-},1500)
-
 }
 
-}
+document.getElementById("msg").innerText="Conta criada. Faça login."
 
-function voltar(){
-window.location.href="login.html"
 }
 
 </script>
