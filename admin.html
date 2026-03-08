@@ -2,13 +2,16 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Painel ADM</title>
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=40">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
+  <script src="config.js?v=40"></script>
 </head>
 <body>
 
@@ -19,15 +22,14 @@
 
 <section class="card">
   <h2>Controle da Rifa</h2>
-
   <button onclick="ligar()">Ligar rifa</button>
   <button onclick="desligar()">Desligar rifa</button>
 </section>
 
 <section class="card">
   <h2>Ferramentas</h2>
-
   <button onclick="resetar()">RESETAR SISTEMA</button>
+  <p id="msg"></p>
 </section>
 
 <section class="card">
@@ -40,29 +42,34 @@
   <div id="listaPagos"></div>
 </section>
 
+<section class="card">
+  <h2>Todos os itens</h2>
+  <div id="listaTodos"></div>
+</section>
+
 <script>
   async function ligar() {
-    await sb
+    const { error } = await sb
       .from("campaigns")
       .update({ ativa: true })
       .eq("id", 1)
 
-    alert("Rifa ligada")
+    document.getElementById("msg").innerText = error ? error.message : "Rifa ligada"
   }
 
   async function desligar() {
-    await sb
+    const { error } = await sb
       .from("campaigns")
       .update({ ativa: false })
       .eq("id", 1)
 
-    alert("Rifa desligada")
+    document.getElementById("msg").innerText = error ? error.message : "Rifa desligada"
   }
 
   async function resetar() {
     if (!confirm("Resetar tudo?")) return
 
-    await sb
+    const { error } = await sb
       .from("items")
       .update({
         status: "livre",
@@ -73,14 +80,19 @@
         reservado_email: null,
         reservado_telefone: null
       })
-      .neq("id", 0)
+      .not("id", "is", null)
 
-    alert("Sistema resetado")
-    carregar()
+    if (error) {
+      document.getElementById("msg").innerText = error.message
+      return
+    }
+
+    document.getElementById("msg").innerText = "Sistema resetado"
+    await carregar()
   }
 
   async function confirmar(id) {
-    await sb
+    const { error } = await sb
       .from("items")
       .update({
         status: "pago",
@@ -88,11 +100,17 @@
       })
       .eq("id", id)
 
-    carregar()
+    if (error) {
+      document.getElementById("msg").innerText = error.message
+      return
+    }
+
+    document.getElementById("msg").innerText = "Pagamento confirmado"
+    await carregar()
   }
 
   async function liberar(id) {
-    await sb
+    const { error } = await sb
       .from("items")
       .update({
         status: "livre",
@@ -105,16 +123,96 @@
       })
       .eq("id", id)
 
-    carregar()
+    if (error) {
+      document.getElementById("msg").innerText = error.message
+      return
+    }
+
+    document.getElementById("msg").innerText = "Item liberado"
+    await carregar()
+  }
+
+  function criarCardAdmin(item) {
+    const email = item.reservado_email || "-"
+    const telefone = item.reservado_telefone || "-"
+
+    const card = document.createElement("div")
+    card.className = "bicho " + item.status
+
+    card.innerHTML = `
+      <h3>${item.nome}</h3>
+      <p>Status: ${item.status}</p>
+      <p>Valor: R$ ${Number(item.valor || 0).toFixed(2).replace(".", ",")}</p>
+      <p>Email: ${email}</p>
+      <p>Telefone: ${telefone}</p>
+    `
+
+    return card
   }
 
   async function carregar() {
-    const { data: items } = await sb
+    const { data: items, error } = await sb
       .from("items")
       .select("*")
       .order("id")
 
+    if (error) {
+      document.getElementById("msg").innerText = error.message
+      return
+    }
+
     const listaReservados = document.getElementById("listaReservados")
     const listaPagos = document.getElementById("listaPagos")
+    const listaTodos = document.getElementById("listaTodos")
 
-    listaReserv
+    listaReservados.innerHTML = ""
+    listaPagos.innerHTML = ""
+    listaTodos.innerHTML = ""
+
+    items.forEach(item => {
+      const cardTodos = criarCardAdmin(item)
+      listaTodos.appendChild(cardTodos)
+
+      if (item.status === "reservado") {
+        const card = criarCardAdmin(item)
+
+        const btnConfirmar = document.createElement("button")
+        btnConfirmar.innerText = "Confirmar pagamento"
+        btnConfirmar.onclick = () => confirmar(item.id)
+
+        const btnLiberar = document.createElement("button")
+        btnLiberar.innerText = "Liberar"
+        btnLiberar.onclick = () => liberar(item.id)
+
+        card.appendChild(btnConfirmar)
+        card.appendChild(document.createElement("br"))
+        card.appendChild(document.createElement("br"))
+        card.appendChild(btnLiberar)
+
+        listaReservados.appendChild(card)
+      }
+
+      if (item.status === "pago") {
+        const card = criarCardAdmin(item)
+
+        const btnLiberarPago = document.createElement("button")
+        btnLiberarPago.innerText = "Liberar"
+        btnLiberarPago.onclick = () => liberar(item.id)
+
+        card.appendChild(btnLiberarPago)
+
+        listaPagos.appendChild(card)
+      }
+    })
+  }
+
+  async function logout() {
+    await sb.auth.signOut()
+    window.location.href = "login.html"
+  }
+
+  carregar()
+</script>
+
+</body>
+</html>
