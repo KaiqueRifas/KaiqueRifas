@@ -6,7 +6,7 @@
   <title>Admin</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=200"></script>
+  <script src="config.js?v=201"></script>
 
   <style>
     body{font-family:Arial,sans-serif;background:#f3f3f3;margin:0;padding:20px}
@@ -23,7 +23,7 @@
   <h1>Editar rifa</h1>
 
   <input id="nome" placeholder="Nome da rifa">
-  <input id="valor" type="number" placeholder="Valor da rifa" step="0.01">
+  <input id="valor" placeholder="Valor da rifa">
   <textarea id="premio" placeholder="Premiações" rows="4"></textarea>
   <input id="pix" placeholder="Pix">
 
@@ -35,6 +35,15 @@
 
 <script>
 let campanhaId = null
+
+function tratarValor(v){
+  const limpo = String(v || "")
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".")
+  const numero = parseFloat(limpo)
+  return isNaN(numero) ? 0 : numero
+}
 
 async function buscarCampanha() {
   const { data, error } = await sb
@@ -74,6 +83,11 @@ async function buscarCampanha() {
   return data
 }
 
+function formatarValorInput(v){
+  if (!v) return ""
+  return String(v).replace(".", ",")
+}
+
 async function carregar() {
   const campanha = await buscarCampanha()
   if (!campanha) return
@@ -81,7 +95,7 @@ async function carregar() {
   campanhaId = campanha.id
 
   document.getElementById("nome").value = campanha.nome_rifa || ""
-  document.getElementById("valor").value = campanha.valor || ""
+  document.getElementById("valor").value = formatarValorInput(campanha.valor || "")
   document.getElementById("premio").value = campanha.premiacao || ""
   document.getElementById("pix").value = campanha.chave_pix || ""
 
@@ -95,11 +109,11 @@ async function salvar() {
   campanhaId = campanha.id
 
   const nome = document.getElementById("nome").value.trim()
-  const valor = Number(document.getElementById("valor").value || 0)
+  const valor = tratarValor(document.getElementById("valor").value)
   const premio = document.getElementById("premio").value.trim()
   const pix = document.getElementById("pix").value.trim()
 
-  const { error } = await sb
+  const { data, error } = await sb
     .from("campaigns")
     .update({
       nome_rifa: nome,
@@ -110,11 +124,18 @@ async function salvar() {
       ativa: true
     })
     .eq("id", campanhaId)
+    .select()
+    .single()
 
   if (error) {
     document.getElementById("msg").innerText = error.message
     return
   }
+
+  document.getElementById("nome").value = data.nome_rifa || ""
+  document.getElementById("valor").value = formatarValorInput(data.valor || "")
+  document.getElementById("premio").value = data.premiacao || ""
+  document.getElementById("pix").value = data.chave_pix || ""
 
   document.getElementById("msg").innerText = "Rifa salva e ligada"
 }
