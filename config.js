@@ -1,5 +1,4 @@
 const SUPABASE_URL = "https://hmtjkivzokhljxmrqime.supabase.co"
-
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtdGpraXZ6b2tobGp4bXJxaW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjE4MDEsImV4cCI6MjA4ODUzNzgwMX0.gJ6D7juAmcgI_tYc39JGeYOEcI5G5gUwxqyh3vwDR9w"
 
-window.sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+window.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
