@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Painel ADM</title>
 
-  <link rel="stylesheet" href="style.css?v=60">
+  <link rel="stylesheet" href="style.css?v=70">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=60"></script>
+  <script src="config.js?v=70"></script>
 </head>
 <body>
 
@@ -80,30 +80,21 @@ async function carregarCampanha() {
   }
 
   campanhaId = data.id
-
   document.getElementById("valorRifa").value = data.valor || ""
   document.getElementById("premiacaoRifa").value = data.premiacao || ""
   document.getElementById("pixRifa").value = data.chave_pix || ""
+  document.getElementById("statusCampanha").innerText = ""
 }
 
 async function atualizarValorDosItens(valor) {
-  const { error } = await sb
+  await sb
     .from("items")
     .update({ valor: valor })
     .in("status", ["livre", "reservado"])
-
-  if (error) {
-    document.getElementById("msg").innerText = error.message
-  }
 }
 
 async function ligar() {
   if (!campanhaId) await carregarCampanha()
-
-  if (!campanhaId) {
-    document.getElementById("msg").innerText = "Campanha não encontrada"
-    return
-  }
 
   const { error } = await sb
     .from("campaigns")
@@ -120,11 +111,6 @@ async function ligar() {
 
 async function desligar() {
   if (!campanhaId) await carregarCampanha()
-
-  if (!campanhaId) {
-    document.getElementById("msg").innerText = "Campanha não encontrada"
-    return
-  }
 
   const { errorCampanha } = await sb
     .from("campaigns")
@@ -161,11 +147,6 @@ async function desligar() {
 
 async function salvarRifa() {
   if (!campanhaId) await carregarCampanha()
-
-  if (!campanhaId) {
-    document.getElementById("msg").innerText = "Campanha não encontrada"
-    return
-  }
 
   const valor = document.getElementById("valorRifa").value.trim()
   const premiacao = document.getElementById("premiacaoRifa").value.trim()
@@ -294,7 +275,6 @@ async function carregar() {
 
   listaReservados.innerHTML = ""
   listaPagos.innerHTML = ""
-  document.getElementById("statusCampanha").innerText = ""
 
   items.forEach(item => {
     if (item.status === "reservado") {
