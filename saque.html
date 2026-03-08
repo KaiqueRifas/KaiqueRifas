@@ -8,13 +8,14 @@
 <title>Saque</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=1600"></script>
+<script src="config.js?v=1800"></script>
 
 <style>
 body{
 font-family:Arial;
 background:#f2f2f2;
 padding:20px;
+margin:0;
 }
 
 .container{
@@ -22,32 +23,75 @@ max-width:600px;
 margin:auto;
 }
 
+.topo{
+display:flex;
+justify-content:space-between;
+align-items:center;
+gap:10px;
+margin-bottom:20px;
+}
+
+.topo-botoes{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+}
+
 .card{
 background:white;
 padding:20px;
 border-radius:10px;
 margin-bottom:20px;
+box-shadow:0 2px 8px rgba(0,0,0,0.1);
 }
 
 input{
 width:100%;
-padding:10px;
-margin-bottom:10px;
+padding:12px;
+margin-bottom:12px;
+border:1px solid #ccc;
+border-radius:8px;
+font-size:16px;
+box-sizing:border-box;
 }
 
 button{
-background:#27ae60;
 border:none;
-padding:10px;
+padding:12px 16px;
 color:white;
-border-radius:6px;
+border-radius:8px;
 cursor:pointer;
+font-size:16px;
+}
+
+.btn-saque{
+background:#27ae60;
 width:100%;
+}
+
+.btn-voltar{
+background:#0b3d91;
+}
+
+.btn-sair{
+background:#c0392b;
 }
 
 .item{
 border-bottom:1px solid #eee;
-padding:10px 0;
+padding:12px 0;
+font-size:18px;
+}
+
+.msg{
+margin-top:10px;
+font-weight:bold;
+white-space:pre-line;
+}
+
+.info{
+font-size:18px;
+line-height:1.6;
 }
 </style>
 
@@ -57,102 +101,218 @@ padding:10px 0;
 
 <div class="container">
 
+<div class="topo">
+  <h1>Saque</h1>
+
+  <div class="topo-botoes">
+    <button class="btn-voltar" onclick="voltar()">Voltar</button>
+    <button class="btn-sair" onclick="logout()">Sair</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="info" id="email"></div>
+  <div class="info" id="saldo"></div>
+</div>
+
 <div class="card">
 
-<h2>Solicitar saque</h2>
+  <h2>Solicitar saque</h2>
 
-<input id="valor" placeholder="Valor">
+  <input id="valor" placeholder="Valor">
+  <input id="pix" placeholder="Chave Pix">
 
-<input id="pix" placeholder="Chave Pix">
+  <button class="btn-saque" onclick="solicitar()">Solicitar saque</button>
 
-<button onclick="solicitar()">Solicitar saque</button>
-
-<div id="msg"></div>
+  <div id="msg" class="msg"></div>
 
 </div>
 
 <div class="card">
 
-<h3>Histórico de saques</h3>
+  <h3>Histórico de saques</h3>
 
-<div id="historico"></div>
+  <div id="historico"></div>
 
 </div>
 
 </div>
 
 <script>
+let usuario = null
+let perfilAtual = null
 
-let usuario=null
-
-async function iniciar(){
-
-const { data } = await sb.auth.getUser()
-
-if(!data.user){
-window.location.href="login.html"
-return
+function formatarReal(v){
+  return Number(v || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
 }
 
-usuario=data.user
+function tratarValor(valor){
+  const limpo = String(valor || "")
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".")
+  const numero = parseFloat(limpo)
+  return isNaN(numero) ? 0 : numero
+}
 
-carregarHistorico()
+async function verificarLogin(){
+  const { data } = await sb.auth.getUser()
 
+  if(!data.user){
+    window.location.href = "login.html"
+    return false
+  }
+
+  usuario = data.user
+  return true
+}
+
+async function carregarPerfil(){
+  const { data, error } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("id", usuario.id)
+    .limit(1)
+
+  if(error || !data || data.length === 0){
+    perfilAtual = null
+    document.getElementById("email").innerText = "Conta: " + usuario.email
+    document.getElementById("saldo").innerText = "Saldo: R$ 0,00"
+    return
+  }
+
+  perfilAtual = data[0]
+
+  document.getElementById("email").innerText = "Conta: " + usuario.email
+  document.getElementById("saldo").innerText = "Saldo: R$ " + formatarReal(perfilAtual.saldo || 0)
 }
 
 async function solicitar(){
+  document.getElementById("msg").innerText = ""
 
-const valor=document.getElementById("valor").value
-const pix=document.getElementById("pix").value
+  const valor = tratarValor(document.getElementById("valor").value)
+  const pix = document.getElementById("pix").value.trim()
 
-if(!valor || !pix){
-document.getElementById("msg").innerText="Preencha tudo"
-return
-}
+  if(valor <= 0){
+    document.getElementById("msg").innerText = "Informe um valor válido"
+    return
+  }
 
-await sb
-.from("saques")
-.insert({
-usuario_id:usuario.id,
-email:usuario.email,
-valor:valor,
-pix:pix,
-status:"pendente"
-})
+  if(!pix){
+    document.getElementById("msg").innerText = "Preencha a chave Pix"
+    return
+  }
 
-document.getElementById("msg").innerText="Saque solicitado"
+  await carregarPerfil()
 
-carregarHistorico()
+  if(!perfilAtual){
+    document.getElementById("msg").innerText = "Perfil não encontrado"
+    return
+  }
 
+  const saldoAtual = Number(perfilAtual.saldo || 0)
+
+  if(valor > saldoAtual){
+    document.getElementById("msg").innerText = "Saldo insuficiente para saque"
+    return
+  }
+
+  const novoSaldo = saldoAtual - valor
+
+  const { error: erroSaldo } = await sb
+    .from("profiles")
+    .update({
+      saldo: novoSaldo
+    })
+    .eq("id", usuario.id)
+
+  if(erroSaldo){
+    document.getElementById("msg").innerText = erroSaldo.message
+    return
+  }
+
+  const { error: erroSaque } = await sb
+    .from("saques")
+    .insert({
+      usuario_id: usuario.id,
+      email: usuario.email,
+      valor: valor,
+      pix: pix,
+      status: "pendente"
+    })
+
+  if(erroSaque){
+    await sb
+      .from("profiles")
+      .update({
+        saldo: saldoAtual
+      })
+      .eq("id", usuario.id)
+
+    document.getElementById("msg").innerText = erroSaque.message
+    return
+  }
+
+  document.getElementById("valor").value = ""
+  document.getElementById("pix").value = ""
+  document.getElementById("msg").innerText = "Saque solicitado com sucesso"
+
+  await carregarPerfil()
+  await carregarHistorico()
 }
 
 async function carregarHistorico(){
+  const { data, error } = await sb
+    .from("saques")
+    .select("*")
+    .eq("usuario_id", usuario.id)
+    .order("id", { ascending: false })
 
-const { data } = await sb
-.from("saques")
-.select("*")
-.eq("usuario_id",usuario.id)
-.order("id",{ascending:false})
+  const div = document.getElementById("historico")
+  div.innerHTML = ""
 
-const div=document.getElementById("historico")
+  if(error){
+    div.innerHTML = `<div class="item">${error.message}</div>`
+    return
+  }
 
-div.innerHTML=""
+  if(!data || data.length === 0){
+    div.innerHTML = `<div class="item">Nenhum saque solicitado.</div>`
+    return
+  }
 
-data.forEach(s=>{
+  data.forEach(s => {
+    div.innerHTML += `
+      <div class="item">
+        Valor: R$ ${formatarReal(s.valor)}<br>
+        Chave Pix: ${s.pix || "-"}<br>
+        Status: ${s.status || "-"}
+      </div>
+    `
+  })
+}
 
-div.innerHTML+=`
-<div class="item">
-Valor: R$ ${Number(s.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})}
-<br>Status: ${s.status}
-</div>
-`
+function voltar(){
+  window.location.href = "index.html"
+}
 
-})
+async function logout(){
+  await sb.auth.signOut()
+  window.location.href = "login.html"
+}
 
+async function iniciar(){
+  const ok = await verificarLogin()
+  if(!ok) return
+
+  await carregarPerfil()
+  await carregarHistorico()
 }
 
 iniciar()
-
 </script>
 
 </body>
