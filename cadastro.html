@@ -1,88 +1,72 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Criar conta</title>
 
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
 
-<title>Criar conta</title>
-
-<link rel="stylesheet" href="style.css">
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
 </head>
-
 <body>
 
-<div class="login-box">
+  <div class="login-box">
+    <h2>Criar conta</h2>
 
-<h2>Criar conta</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="senha" placeholder="Senha">
+    <input type="tel" id="telefone" placeholder="Telefone">
 
-<input type="email" id="email" placeholder="Email">
+    <button onclick="criarConta()">Criar conta</button>
 
-<input type="password" id="senha" placeholder="Senha">
+    <br><br>
 
-<input type="tel" id="telefone" placeholder="Telefone">
+    <button onclick="voltar()">Voltar para login</button>
 
-<button onclick="criarConta()">Criar conta</button>
+    <p id="msg"></p>
+  </div>
 
-<br><br>
+  <script>
+    async function criarConta() {
+      const email = document.getElementById("email").value.trim()
+      const senha = document.getElementById("senha").value.trim()
+      const telefone = document.getElementById("telefone").value.trim()
 
-<button onclick="voltar()">Voltar para login</button>
+      if (!email || !senha || !telefone) {
+        document.getElementById("msg").innerText = "Preencha todos os campos"
+        return
+      }
 
-<p id="msg"></p>
+      const { data, error } = await sb.auth.signUp({
+        email: email,
+        password: senha
+      })
 
-</div>
+      if (error) {
+        document.getElementById("msg").innerText = error.message
+        return
+      }
 
+      if (data.user) {
+        await sb.from("profiles").upsert({
+          id: data.user.id,
+          email: email,
+          telefone: telefone
+        })
 
-<script>
+        document.getElementById("msg").innerText = "Conta criada com sucesso"
+        return
+      }
 
-async function criarConta(){
+      document.getElementById("msg").innerText = "Conta criada"
+    }
 
-const email = document.getElementById("email").value
-const senha = document.getElementById("senha").value
-const telefone = document.getElementById("telefone").value
-
-if(!email || !senha || !telefone){
-
-document.getElementById("msg").innerText="Preencha todos os campos"
-return
-
-}
-
-const { error } = await sb.auth.signUp({
-
-email:email,
-password:senha,
-options:{
-data:{
-telefone:telefone
-}
-}
-
-})
-
-if(error){
-
-document.getElementById("msg").innerText = error.message
-return
-
-}
-
-document.getElementById("msg").innerText="Conta criada! Agora faça login."
-
-}
-
-
-function voltar(){
-
-window.location.href="login.html"
-
-}
-
-</script>
+    function voltar() {
+      window.location.href = "login.html"
+    }
+  </script>
 
 </body>
 </html>
